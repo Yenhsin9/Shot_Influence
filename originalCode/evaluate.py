@@ -67,7 +67,7 @@ rnn_kwargs = {'units': 32, 'kernel_regularizer': regularizer}
 dense_kwargs = {'kernel_regularizer': regularizer}
 
 batch_size = 32
-MODEL_NAME = 'SPECIFY_NAME'
+MODEL_NAME = 'onlstm'
 
 
 # Avoid tensorflow use full memory

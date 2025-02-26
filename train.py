@@ -37,7 +37,7 @@ def prepare_data(dataset: pd.DataFrame,
     rally_attributes_f = util.flatten(rally_attributes)
     
     # Generate sequences of rallies
-    for rally_id, rally in dataset.groupby('rally_id'):
+    for rally_id, rally in dataset.groupby(["match_id", "rally_id","set_id"]):
         if min_len > 0 and len(rally) < min_len:
             continue
         shots.append(rally[shot_attributes_f].values.astype('float32'))
@@ -48,7 +48,6 @@ def prepare_data(dataset: pd.DataFrame,
         shots[-1] = np.pad(shots[-1], [pad, (0, 0)])
     shots = np.asarray(shots)
     rallies = np.asarray(rallies)
-
     # Split back to input specification
     shot_attributes_len = util.list_len(shot_attributes)
     if len(shot_attributes_len) > 1:
