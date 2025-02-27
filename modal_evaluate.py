@@ -75,7 +75,7 @@ dense_kwargs = {'kernel_regularizer': regularizer}
 
 batch_size = 32
 MODEL_NAME = 'proposedModal'
-MODEL_PATH = "./model/proposedModal/20250227-113326/final_model.weights.h5"
+MODEL_PATH = "./model/proposedModal/20250227-134055/final_model.weights.h5"
 
 # ✅ Prevent TensorFlow from taking up too much GPU memory
 physical_devices = tf.config.experimental.list_physical_devices('GPU')

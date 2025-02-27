@@ -1,0 +1,8 @@
+Add Maxpooling with training 100 epoch
+20250227-134204, 0.7411479949951172, 0.7960078120231628, 0.14221670164496905
+
+✅ Model weights loaded successfully: ./model/proposedModal/20250227-134055/final_model.weights.h5
+2025-02-27 13:42:06.362215: I tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.cc:117] Plugin optimizer for device_type GPU is enabled.
+65/65 ━━━━━━━━━━━━━━━━━━━━ 2s 19ms/step - AUC: 0.7572 - binary_accuracy: 0.7913 - loss: 0.5004  
+65/65 ━━━━━━━━━━━━━━━━━━━━ 1s 14ms/step  
+✅ Testing completed!AUC: 0.7411479949951172, Accuracy: 0.7960078120231628, Brier Score: 0.14221670164496905
