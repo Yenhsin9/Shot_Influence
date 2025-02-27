@@ -66,40 +66,45 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,embed_types_size=Non
 
 # Proposed modal: CNN + Position + Mutihead Attention
 def proposed_model(shot_sequence_shape: Tuple[int, int], 
-                            embed_types_size: int = None,
-                            embed_area_size: int = None,
-                            rally_info_shape: int = None,
-                            cnn_kwargs: Dict[str, Any] = {'filters': 32, 'kernel_size': 3},
-                            transformer_kwargs: Dict[str, Any] = {},
-                            dense_kwargs: Dict[str, Any] = {}) -> tf.keras.Model:
+                   embed_types_size: int = None,
+                   embed_area_size: int = None,
+                   rally_info_shape: int = None,
+                   cnn_kwargs: Dict[str, Any] = {'filters': 32, 'kernel_size': 3},
+                   transformer_kwargs: Dict[str, Any] = {},
+                   dense_kwargs: Dict[str, Any] = {}) -> tf.keras.Model:
 
-    # ✅ 預處理輸入，獲取 `masked_sequence` & `inputs`
     inputs, masked_sequence = preprocess_inputs(shot_sequence_shape, rally_info_shape,
                                                 embed_types_size=embed_types_size, embed_area_size=embed_area_size)
 
-    # ✅ CNN 短期學習 (Short-Term Feature Extraction)
+    # ✅ CNN Shorterm 
     layer_cnn = StaggeredConv1D(name='Local_pattern_extraction', **cnn_kwargs)
-    pattern_sequence = layer_cnn(masked_sequence)  # (None, 66, feature_dim)
+    pattern_sequence = layer_cnn(masked_sequence)  # (None, seq_len, feature_dim)
 
     # ✅ Positional Encoding
     seq_len = shot_sequence_shape[0]
     pos_encoding = Embedding(input_dim=seq_len, output_dim=pattern_sequence.shape[-1])(tf.range(seq_len))
-    pattern_sequence_with_pos = pattern_sequence + pos_encoding  # 讓 Transformer 知道順序
+    pattern_sequence_with_pos = pattern_sequence + pos_encoding  
 
     # ✅ Transformer Encoder Self-Attention
     mha = MultiHeadAttention(num_heads=transformer_kwargs['num_heads'], key_dim=transformer_kwargs['key_dim'])
-    attn_output = mha(pattern_sequence_with_pos, pattern_sequence_with_pos)
-    attn_output = LayerNormalization(epsilon=1e-6)(attn_output + pattern_sequence_with_pos)  # 殘差連接
+    attn_output, attn_weights = mha(pattern_sequence_with_pos, pattern_sequence_with_pos, return_attention_scores=True)
+
+    # ✅ Layer Normalization 
+    attn_output = LayerNormalization(epsilon=1e-6)(attn_output + pattern_sequence_with_pos)
+
+    # ✅ FFN
     ffn = Dense(transformer_kwargs['ff_dim'], activation='relu')(attn_output)
-    ffn_output = Dense(pattern_sequence.shape[-1])(ffn)  # 轉回原始維度
-    transformer_output = LayerNormalization(epsilon=1e-6)(ffn_output + attn_output)  # 第二次殘差連接
+    ffn_output = Dense(pattern_sequence.shape[-1])(ffn)
+    transformer_output = LayerNormalization(epsilon=1e-6)(ffn_output + attn_output)
 
-    # ✅ 最終 Concatenate Rally Information
-    layer_concat_rally = tf.keras.layers.Concatenate(name='Seq_rally_merging')([transformer_output[:, -1, :], inputs[-1]])
+    # ✅  MAX POOLING 
+    rally_representation = tf.keras.layers.GlobalMaxPooling1D()(transformer_output)
 
-    # ✅ 勝率預測 (Win Probability Prediction)
+    # ✅ Concatenate Rally Information
+    layer_concat_rally = tf.keras.layers.Concatenate(name='Seq_rally_merging')([rally_representation, inputs[-1]])
+
+    # ✅ (Win Probability Prediction)
     output_win_prob = Dense(units=1, activation='sigmoid', **dense_kwargs)(layer_concat_rally)
 
-    # ✅ 建立模型
     model_predict = tf.keras.Model(inputs=inputs, outputs=output_win_prob)
     return model_predict

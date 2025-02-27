@@ -123,10 +123,6 @@ train_x = [train_hit_area_encoded, train_player_area_encoded, train_opponent_are
 val_x = [val_hit_area_encoded, val_player_area_encoded, val_opponent_area_encoded, val_shots, val_shot_types, val_time_proportion, val_rallies]
 test_x = [test_hit_area_encoded, test_player_area_encoded, test_opponent_area_encoded, test_shots, test_shot_types, test_time_proportion, test_rallies]
 
-train_target = np.expand_dims(train_target, axis=-1)
-val_target = np.expand_dims(val_target, axis=-1)
-test_target = np.expand_dims(test_target, axis=-1)
-
 #checkpoint
 checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     filepath=os.path.join(MODEL_PATH, "weights_epoch_{epoch:02d}.weights.h5"),  
