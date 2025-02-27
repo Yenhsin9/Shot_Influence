@@ -37,17 +37,17 @@ print(f"📊 Training set size: {len(train_data)}, Validation set size: {len(val
 test_data.to_csv("./new_data/test_data.csv", index=False)
 print("✅ Test dataset saved successfully!")
 
-(train_shots, train_shot_types), (train_rallies, train_target, train_rally_id) = train.prepare_data(
+(train_shots, train_shot_types), (train_rallies, train_target, train_rally_id, train_players) = train.prepare_data(
     train_data, 
     [shot_predictors, ['hit_area', 'player_location_area', 'opponent_location_area', 'type']], 
-    [rally_predictors, target, 'rally_id'], 
+    [rally_predictors, target, 'rally_id', 'player_id'],  
     pad_to=seq_len
 )
 
-(val_shots, val_shot_types), (val_rallies, val_target, val_rally_id) = train.prepare_data(
+(val_shots, val_shot_types), (val_rallies, val_target, val_rally_id, val_players) = train.prepare_data(
     val_data, 
     [shot_predictors, ['hit_area', 'player_location_area', 'opponent_location_area', 'type']], 
-    [rally_predictors, target, 'rally_id'], 
+    [rally_predictors, target, 'rally_id', 'player_id'],  
     pad_to=seq_len
 )
 
@@ -71,7 +71,6 @@ shot_predictors.remove('time_proportion')
 
 # ✅ Set model hyperparameters
 regularizer = tf.keras.regularizers.l2(0.01)
-optimizer = 'adam'
 loss = 'binary_crossentropy'
 metrics = ['AUC', 'binary_accuracy']
 epochs = 100
@@ -83,16 +82,25 @@ os.makedirs(MODEL_PATH, exist_ok=True)
 
 n_shot_types = len(uniques_type) + 1
 n_area_types = encoded['player_location_area'].nunique() + 1
+n_player_types = encoded['player_id'].nunique() + 1  
 cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': regularizer, 'activation': 'relu'}
-transformer_kwargs = {'num_heads': 4, 'key_dim': 64, 'ff_dim': 128}
+transformer_kwargs = {
+    'num_heads': 1,  # Reduce heads to match paper
+    'key_dim': 32,  # Reduce key_dim to 32
+    'ff_dim': 32,  # Reduce FFN dimension to 32
+    'inner_dim': 64  # Add `dinner` as inner FFN dimension
+}
 dense_kwargs = {'kernel_regularizer': regularizer}
 batch_size = 32
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.002)  
 
 import json
 param_dict = {
-    "n_shot_types": n_shot_types,  # Dataset-dependent
-    "n_area_types": n_area_types,  # Dataset-dependent
+    "n_shot_types": n_shot_types, 
+    "n_area_types": n_area_types,  
+    "n_player_types": n_player_types 
 }
+
 # Save parameters to a JSON file
 param_path = "./hyperParameter/model_params.json"
 with open(param_path, "w") as f:
@@ -112,6 +120,7 @@ prediction_model = rc.proposed_model(
     (seq_len, len(shot_predictors)),
     embed_types_size=n_shot_types,
     embed_area_size=n_area_types,
+    embed_player_size=n_player_types,
     rally_info_shape=len(rally_predictors),
     cnn_kwargs=cnn_kwargs,
     transformer_kwargs=transformer_kwargs,
@@ -120,8 +129,12 @@ prediction_model = rc.proposed_model(
 
 prediction_model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
-train_x = [train_hit_area_encoded, train_player_area_encoded, train_opponent_area_encoded, train_shots, train_shot_types, train_time_proportion, train_rallies]
-val_x = [val_hit_area_encoded, val_player_area_encoded, val_opponent_area_encoded, val_shots, val_shot_types, val_time_proportion, val_rallies]
+train_x = [train_players, train_hit_area_encoded, train_player_area_encoded, train_opponent_area_encoded,
+           train_shots, train_shot_types, train_time_proportion, train_rallies]
+
+val_x = [val_players, val_hit_area_encoded, val_player_area_encoded, val_opponent_area_encoded,
+         val_shots, val_shot_types, val_time_proportion, val_rallies]
+
 
 #checkpoint
 checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(

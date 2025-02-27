@@ -28,6 +28,9 @@ def process_dataset(dataset, output_file):
     # is_target_turn 
     dataset["is_target_turn"] = (dataset["player"] == "B").astype(float)
 
+    # Convert player_id ("A" or "B") to integer values (A -> 0, B -> 1)
+    dataset['player_id'] = dataset['player'].astype('category').cat.codes
+
     #time proportion
     dataset["time"] = pd.to_datetime(dataset["time"], format="%H:%M:%S").dt.hour * 3600 + \
                   pd.to_datetime(dataset["time"], format="%H:%M:%S").dt.minute * 60 + \

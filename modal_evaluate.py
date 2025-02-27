@@ -30,8 +30,9 @@ with open(param_path, "r") as f:
 # Load dataset-dependent parameters
 n_shot_types = param_dict["n_shot_types"]
 n_area_types = param_dict["n_area_types"]
+n_player_types = param_dict["n_player_types"]
 
-print(f"✅ Model parameters loaded: n_shot_types={n_shot_types}, n_area_types={n_area_types}")
+print(f"✅ Model parameters loaded: n_shot_types={n_shot_types}, n_area_types={n_area_types},n_player_types={n_player_types}")
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
 
@@ -49,10 +50,10 @@ encoded = pd.get_dummies(test_data, columns=encode_columns)
 codes_type, uniques_type = pd.factorize(encoded['type'])
 encoded['type'] = codes_type + 1  # Reserve 0 for padding
 
-(test_shots, test_shot_types), (test_rallies, test_target, test_rally_id) = train.prepare_data(
+(test_shots, test_shot_types), (test_rallies, test_target, test_rally_id,test_players) = train.prepare_data(
     test_data, 
     [shot_predictors, ['hit_area', 'player_location_area', 'opponent_location_area', 'type']], 
-    [rally_predictors, target, 'rally_id'], 
+    [rally_predictors, target, 'rally_id', 'player_id'],  
     pad_to=seq_len
 )
 
@@ -77,11 +78,17 @@ epochs = 100
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir='./history/', histogram_freq=1)
 
 cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': regularizer, 'activation': 'relu'}
-transformer_kwargs = {'num_heads': 4, 'key_dim': 64, 'ff_dim': 128}
+transformer_kwargs = {
+    'num_heads': 1,  # Reduce heads to match paper
+    'key_dim': 32,  # Reduce key_dim to 32
+    'ff_dim': 32,  # Reduce FFN dimension to 32
+    'inner_dim': 64  # Add `dinner` as inner FFN dimension
+}
 dense_kwargs = {'kernel_regularizer': regularizer}
 batch_size = 32
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.002)  
 MODEL_NAME = 'proposedModal'
-MODEL_PATH = "./model/proposedModal/20250227-164825/final_model.weights.h5"
+MODEL_PATH = "./model/proposedModal/20250227-192107/final_model.weights.h5"
 
 # ✅ Prevent TensorFlow from taking up too much GPU memory
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -94,6 +101,7 @@ except:
 prediction_model = rc.proposed_model((seq_len, len(shot_predictors)),
                                      embed_types_size=n_shot_types,
                                      embed_area_size=n_area_types,
+                                     embed_player_size=n_player_types,
                                      rally_info_shape=len(rally_predictors),
                                      cnn_kwargs=cnn_kwargs,
                                      transformer_kwargs=transformer_kwargs,
@@ -110,7 +118,7 @@ else:
     exit()
 
 # ✅ Preparing test data
-test_x = [test_hit_area_encoded, test_player_area_encoded, test_opponent_area_encoded,
+test_x = [test_players,test_hit_area_encoded, test_player_area_encoded, test_opponent_area_encoded,
           test_shots, test_shot_types, test_time_proportion, test_rallies]
 
 # ✅ Conducting test evaluation

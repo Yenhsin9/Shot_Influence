@@ -1,0 +1,71 @@
+Train with epoch22 Add the playembedding in and adjust the hyperparameter
+20250227-193139, 0.7635226249694824, 0.9362220168113708, 0.05743222161523796
+
+
+❯ python modal_evaluate.py
+✅ Test dataset loaded successfully!
+✅ Model parameters loaded: n_shot_types=20, n_area_types=15,n_player_types=3
+2025-02-27 19:31:39.712010: I metal_plugin/src/device/metal_device.cc:1154] Metal device set to: Apple M1
+2025-02-27 19:31:39.712044: I metal_plugin/src/device/metal_device.cc:296] systemMemory: 16.00 GB
+2025-02-27 19:31:39.712050: I metal_plugin/src/device/metal_device.cc:313] maxCacheSize: 5.33 GB
+2025-02-27 19:31:39.712067: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:305] Could not identify NUMA node of platform GPU ID 0, defaulting to 0. Your kernel may not have been built with NUMA support.
+2025-02-27 19:31:39.712079: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:271] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 0 MB memory) -> physical PluggableDevice (device: 0, name: METAL, pci bus id: <undefined>)
+/Users/yenhsin/miniforge3/envs/tf_m1/lib/python3.9/site-packages/keras/src/layers/layer.py:938: UserWarning: Layer 'lambda' (of type Lambda) was passed an input with a mask attached to it. However, this layer does not support masking and will therefore destroy the mask information. Downstream layers will not see the mask.
+  warnings.warn(
+/Users/yenhsin/miniforge3/envs/tf_m1/lib/python3.9/site-packages/keras/src/saving/saving_lib.py:757: UserWarning: Skipping variable loading for optimizer 'adam', because it has 2 variables whereas the saved optimizer has 56 variables. 
+  saveable.load_own_variables(weights_store.get(inner_path))
+✅ Model weights loaded successfully: ./model/proposedModal/20250227-192107/final_model.weights.h5
+2025-02-27 19:31:40.300492: I tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.cc:117] Plugin optimizer for device_type GPU is enabled.
+65/65 ━━━━━━━━━━━━━━━━━━━━ 3s 19ms/step - AUC: 0.7494 - binary_accuracy: 0.9268 - loss: 0.2668
+65/65 ━━━━━━━━━━━━━━━━━━━━ 1s 12ms/step  
+✅ Testing completed!AUC: 0.7635226249694824, Accuracy: 0.9362220168113708, Brier Score: 0.05743222161523796
+
+
+
+
+#Old hyperparameter
+# ✅ Set model hyperparameters
+regularizer = tf.keras.regularizers.l2(0.01)
+optimizer = 'adam'
+loss = 'binary_crossentropy'
+metrics = ['AUC', 'binary_accuracy']
+epochs = 100
+
+MODEL_DIR = "./model/"
+MODEL_NAME = "proposedModal"  
+MODEL_PATH = os.path.join(MODEL_DIR, MODEL_NAME)
+os.makedirs(MODEL_PATH, exist_ok=True)
+
+n_shot_types = len(uniques_type) + 1
+n_area_types = encoded['player_location_area'].nunique() + 1
+cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': regularizer, 'activation': 'relu'}
+transformer_kwargs = {'num_heads': 4, 'key_dim': 64, 'ff_dim': 128}
+dense_kwargs = {'kernel_regularizer': regularizer}
+batch_size = 32
+
+
+#New hyperparameter
+# ✅ Set model hyperparameters
+regularizer = tf.keras.regularizers.l2(0.01)
+loss = 'binary_crossentropy'
+metrics = ['AUC', 'binary_accuracy']
+epochs = 100
+
+MODEL_DIR = "./model/"
+MODEL_NAME = "proposedModal"  
+MODEL_PATH = os.path.join(MODEL_DIR, MODEL_NAME)
+os.makedirs(MODEL_PATH, exist_ok=True)
+
+n_shot_types = len(uniques_type) + 1
+n_area_types = encoded['player_location_area'].nunique() + 1
+n_player_types = encoded['player_id'].nunique() + 1  
+cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': regularizer, 'activation': 'relu'}
+transformer_kwargs = {
+    'num_heads': 1,  # Reduce heads to match paper
+    'key_dim': 32,  # Reduce key_dim to 32
+    'ff_dim': 32,  # Reduce FFN dimension to 32
+    'inner_dim': 64  # Add `dinner` as inner FFN dimension
+}
+dense_kwargs = {'kernel_regularizer': regularizer}
+batch_size = 32
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.002)  
