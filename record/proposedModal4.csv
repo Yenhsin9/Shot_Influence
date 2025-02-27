@@ -1,0 +1,20 @@
+with Epoch 100 training and real unseen test data
+20250227-163909, 0.6499235033988953, 0.7361246347427368, 0.18257055093590208
+
+
+
+❯ python modal_evaluate.py
+✅ Test dataset loaded successfully!
+✅ Model parameters loaded: n_shot_types=20, n_area_types=15
+2025-02-27 16:39:09.816902: I metal_plugin/src/device/metal_device.cc:1154] Metal device set to: Apple M1
+2025-02-27 16:39:09.816935: I metal_plugin/src/device/metal_device.cc:296] systemMemory: 16.00 GB
+2025-02-27 16:39:09.816941: I metal_plugin/src/device/metal_device.cc:313] maxCacheSize: 5.33 GB
+2025-02-27 16:39:09.816956: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:305] Could not identify NUMA node of platform GPU ID 0, defaulting to 0. Your kernel may not have been built with NUMA support.
+2025-02-27 16:39:09.816968: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:271] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 0 MB memory) -> physical PluggableDevice (device: 0, name: METAL, pci bus id: <undefined>)
+/Users/yenhsin/miniforge3/envs/tf_m1/lib/python3.9/site-packages/keras/src/saving/saving_lib.py:757: UserWarning: Skipping variable loading for optimizer 'adam', because it has 2 variables whereas the saved optimizer has 54 variables. 
+  saveable.load_own_variables(weights_store.get(inner_path))
+✅ Model weights loaded successfully: ./model/proposedModal/20250227-162335/final_model.weights.h5
+2025-02-27 16:39:10.406157: I tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.cc:117] Plugin optimizer for device_type GPU is enabled.
+65/65 ━━━━━━━━━━━━━━━━━━━━ 3s 18ms/step - AUC: 0.6832 - binary_accuracy: 0.7405 - loss: 0.6029
+65/65 ━━━━━━━━━━━━━━━━━━━━ 1s 13ms/step  
+✅ Testing completed!AUC: 0.6499235033988953, Accuracy: 0.7361246347427368, Brier Score: 0.18257055093590208

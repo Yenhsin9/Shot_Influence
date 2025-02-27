@@ -1,0 +1,176 @@
+with 56 epoch training and real unseen data
+20250227-165359, AUC: 0.7168205976486206, Accuracy: 0.9118792414665222, Brier Score: 0.07272609910713981
+
+
+
+❯ python training.py
+📊 Training set size: 29187, Validation set size: 3648, Test set size: 3649
+✅ Test dataset saved successfully!
+✅ Model parameters saved to ./hyperParameter/model_params.json
+2025-02-27 16:48:27.316781: I metal_plugin/src/device/metal_device.cc:1154] Metal device set to: Apple M1
+2025-02-27 16:48:27.316803: I metal_plugin/src/device/metal_device.cc:296] systemMemory: 16.00 GB
+2025-02-27 16:48:27.316808: I metal_plugin/src/device/metal_device.cc:313] maxCacheSize: 5.33 GB
+2025-02-27 16:48:27.316824: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:305] Could not identify NUMA node of platform GPU ID 0, defaulting to 0. Your kernel may not have been built with NUMA support.
+2025-02-27 16:48:27.316835: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:271] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 0 MB memory) -> physical PluggableDevice (device: 0, name: METAL, pci bus id: <undefined>)
+🔄 Load new weight: ./model/proposedModal/weights_epoch_22.weights.h5
+/Users/yenhsin/miniforge3/envs/tf_m1/lib/python3.9/site-packages/keras/src/saving/saving_lib.py:757: UserWarning: Skipping variable loading for optimizer 'adam', because it has 2 variables whereas the saved optimizer has 54 variables. 
+  saveable.load_own_variables(weights_store.get(inner_path))
+🚀 Training start from epoch 23 ...
+🔥🔥🔥 Start training！
+Epoch 23/100
+2025-02-27 16:48:28.480211: I tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.cc:117] Plugin optimizer for device_type GPU is enabled.
+114/114 ━━━━━━━━━━━━━━━━━━━━ 0s 70ms/step - AUC: 0.9247 - binary_accuracy: 0.9434 - loss: 0.1807  
+Epoch 23: saving model to ./model/proposedModal/weights_epoch_23.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 13s 86ms/step - AUC: 0.9246 - binary_accuracy: 0.9434 - loss: 0.1807 - val_AUC: 0.8093 - val_binary_accuracy: 0.8208 - val_loss: 0.4250
+Epoch 24/100
+114/114 ━━━━━━━━━━━━━━━━━━━━ 0s 64ms/step - AUC: 0.9375 - binary_accuracy: 0.9455 - loss: 0.1712 
+Epoch 24: saving model to ./model/proposedModal/weights_epoch_24.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 74ms/step - AUC: 0.9375 - binary_accuracy: 0.9455 - loss: 0.1712 - val_AUC: 0.8142 - val_binary_accuracy: 0.8247 - val_loss: 0.4082
+Epoch 25/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9592 - binary_accuracy: 0.9547 - loss: 0.1484 
+Epoch 25: saving model to ./model/proposedModal/weights_epoch_25.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9590 - binary_accuracy: 0.9546 - loss: 0.1486 - val_AUC: 0.8093 - val_binary_accuracy: 0.8848 - val_loss: 0.3272
+Epoch 26/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 64ms/step - AUC: 0.9572 - binary_accuracy: 0.9505 - loss: 0.1517 
+Epoch 26: saving model to ./model/proposedModal/weights_epoch_26.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 73ms/step - AUC: 0.9570 - binary_accuracy: 0.9504 - loss: 0.1518 - val_AUC: 0.8035 - val_binary_accuracy: 0.8657 - val_loss: 0.3499
+Epoch 27/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9463 - binary_accuracy: 0.9519 - loss: 0.1517     
+Epoch 27: saving model to ./model/proposedModal/weights_epoch_27.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9464 - binary_accuracy: 0.9519 - loss: 0.1518 - val_AUC: 0.8166 - val_binary_accuracy: 0.7710 - val_loss: 0.5069
+Epoch 28/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 64ms/step - AUC: 0.9667 - binary_accuracy: 0.9585 - loss: 0.1370 
+Epoch 28: saving model to ./model/proposedModal/weights_epoch_28.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9666 - binary_accuracy: 0.9584 - loss: 0.1372 - val_AUC: 0.8179 - val_binary_accuracy: 0.8716 - val_loss: 0.3492
+Epoch 29/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 64ms/step - AUC: 0.9660 - binary_accuracy: 0.9538 - loss: 0.1489 
+Epoch 29: saving model to ./model/proposedModal/weights_epoch_29.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9660 - binary_accuracy: 0.9537 - loss: 0.1489 - val_AUC: 0.7996 - val_binary_accuracy: 0.8916 - val_loss: 0.3111
+Epoch 30/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9720 - binary_accuracy: 0.9574 - loss: 0.1402
+Epoch 30: saving model to ./model/proposedModal/weights_epoch_30.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9718 - binary_accuracy: 0.9574 - loss: 0.1403 - val_AUC: 0.7859 - val_binary_accuracy: 0.8955 - val_loss: 0.3101
+Epoch 31/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 64ms/step - AUC: 0.9705 - binary_accuracy: 0.9632 - loss: 0.1285
+Epoch 31: saving model to ./model/proposedModal/weights_epoch_31.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9704 - binary_accuracy: 0.9631 - loss: 0.1288 - val_AUC: 0.7834 - val_binary_accuracy: 0.7998 - val_loss: 0.4799
+Epoch 32/100
+114/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9725 - binary_accuracy: 0.9586 - loss: 0.1375
+Epoch 32: saving model to ./model/proposedModal/weights_epoch_32.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9725 - binary_accuracy: 0.9586 - loss: 0.1375 - val_AUC: 0.8120 - val_binary_accuracy: 0.8403 - val_loss: 0.3905
+Epoch 33/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9796 - binary_accuracy: 0.9676 - loss: 0.1304 
+Epoch 33: saving model to ./model/proposedModal/weights_epoch_33.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9794 - binary_accuracy: 0.9675 - loss: 0.1306 - val_AUC: 0.8172 - val_binary_accuracy: 0.8901 - val_loss: 0.3147
+Epoch 34/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9797 - binary_accuracy: 0.9650 - loss: 0.1290
+Epoch 34: saving model to ./model/proposedModal/weights_epoch_34.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9796 - binary_accuracy: 0.9650 - loss: 0.1291 - val_AUC: 0.8104 - val_binary_accuracy: 0.8862 - val_loss: 0.3203
+Epoch 35/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9796 - binary_accuracy: 0.9610 - loss: 0.1284
+Epoch 35: saving model to ./model/proposedModal/weights_epoch_35.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9795 - binary_accuracy: 0.9610 - loss: 0.1286 - val_AUC: 0.8028 - val_binary_accuracy: 0.8364 - val_loss: 0.3951
+Epoch 36/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9851 - binary_accuracy: 0.9705 - loss: 0.1194
+Epoch 36: saving model to ./model/proposedModal/weights_epoch_36.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9849 - binary_accuracy: 0.9704 - loss: 0.1196 - val_AUC: 0.8145 - val_binary_accuracy: 0.8594 - val_loss: 0.3742
+Epoch 37/100
+114/114 ━━━━━━━━━━━━━━━━━━━━ 0s 65ms/step - AUC: 0.9830 - binary_accuracy: 0.9688 - loss: 0.1223
+Epoch 37: saving model to ./model/proposedModal/weights_epoch_37.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 9s 75ms/step - AUC: 0.9829 - binary_accuracy: 0.9687 - loss: 0.1224 - val_AUC: 0.8058 - val_binary_accuracy: 0.8247 - val_loss: 0.4361
+Epoch 38/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9872 - binary_accuracy: 0.9672 - loss: 0.1205 
+Epoch 38: saving model to ./model/proposedModal/weights_epoch_38.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9871 - binary_accuracy: 0.9672 - loss: 0.1206 - val_AUC: 0.8143 - val_binary_accuracy: 0.8701 - val_loss: 0.3529
+Epoch 39/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9846 - binary_accuracy: 0.9693 - loss: 0.1215 
+Epoch 39: saving model to ./model/proposedModal/weights_epoch_39.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9846 - binary_accuracy: 0.9693 - loss: 0.1216 - val_AUC: 0.8081 - val_binary_accuracy: 0.8301 - val_loss: 0.4286
+Epoch 40/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9842 - binary_accuracy: 0.9752 - loss: 0.1184
+Epoch 40: saving model to ./model/proposedModal/weights_epoch_40.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9841 - binary_accuracy: 0.9750 - loss: 0.1185 - val_AUC: 0.8229 - val_binary_accuracy: 0.8584 - val_loss: 0.3741
+Epoch 41/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9885 - binary_accuracy: 0.9724 - loss: 0.1166
+Epoch 41: saving model to ./model/proposedModal/weights_epoch_41.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9885 - binary_accuracy: 0.9724 - loss: 0.1166 - val_AUC: 0.7964 - val_binary_accuracy: 0.9209 - val_loss: 0.2654
+Epoch 42/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 64ms/step - AUC: 0.9855 - binary_accuracy: 0.9688 - loss: 0.1146 
+Epoch 42: saving model to ./model/proposedModal/weights_epoch_42.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 73ms/step - AUC: 0.9854 - binary_accuracy: 0.9687 - loss: 0.1148 - val_AUC: 0.8099 - val_binary_accuracy: 0.8569 - val_loss: 0.3747
+Epoch 43/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9819 - binary_accuracy: 0.9748 - loss: 0.1197 
+Epoch 43: saving model to ./model/proposedModal/weights_epoch_43.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9819 - binary_accuracy: 0.9748 - loss: 0.1197 - val_AUC: 0.8012 - val_binary_accuracy: 0.8511 - val_loss: 0.3910
+Epoch 44/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9874 - binary_accuracy: 0.9759 - loss: 0.1107 
+Epoch 44: saving model to ./model/proposedModal/weights_epoch_44.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9874 - binary_accuracy: 0.9759 - loss: 0.1108 - val_AUC: 0.8065 - val_binary_accuracy: 0.8804 - val_loss: 0.3350
+Epoch 45/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9931 - binary_accuracy: 0.9791 - loss: 0.1037 
+Epoch 45: saving model to ./model/proposedModal/weights_epoch_45.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9930 - binary_accuracy: 0.9791 - loss: 0.1038 - val_AUC: 0.8022 - val_binary_accuracy: 0.8652 - val_loss: 0.3684
+Epoch 46/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9783 - binary_accuracy: 0.9756 - loss: 0.1147    
+Epoch 46: saving model to ./model/proposedModal/weights_epoch_46.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9785 - binary_accuracy: 0.9756 - loss: 0.1147 - val_AUC: 0.8007 - val_binary_accuracy: 0.8457 - val_loss: 0.3997
+Epoch 47/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9909 - binary_accuracy: 0.9778 - loss: 0.1086 
+Epoch 47: saving model to ./model/proposedModal/weights_epoch_47.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9908 - binary_accuracy: 0.9777 - loss: 0.1087 - val_AUC: 0.8081 - val_binary_accuracy: 0.8857 - val_loss: 0.3312
+Epoch 48/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 63ms/step - AUC: 0.9900 - binary_accuracy: 0.9757 - loss: 0.1092 
+Epoch 48: saving model to ./model/proposedModal/weights_epoch_48.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 72ms/step - AUC: 0.9900 - binary_accuracy: 0.9757 - loss: 0.1093 - val_AUC: 0.8128 - val_binary_accuracy: 0.7490 - val_loss: 0.5559
+Epoch 49/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9863 - binary_accuracy: 0.9771 - loss: 0.1144
+Epoch 49: saving model to ./model/proposedModal/weights_epoch_49.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9863 - binary_accuracy: 0.9770 - loss: 0.1144 - val_AUC: 0.8206 - val_binary_accuracy: 0.8101 - val_loss: 0.4531
+Epoch 50/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9935 - binary_accuracy: 0.9825 - loss: 0.1031
+Epoch 50: saving model to ./model/proposedModal/weights_epoch_50.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 70ms/step - AUC: 0.9935 - binary_accuracy: 0.9824 - loss: 0.1031 - val_AUC: 0.8161 - val_binary_accuracy: 0.8438 - val_loss: 0.3934
+Epoch 51/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9950 - binary_accuracy: 0.9825 - loss: 0.0963 
+Epoch 51: saving model to ./model/proposedModal/weights_epoch_51.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9950 - binary_accuracy: 0.9825 - loss: 0.0964 - val_AUC: 0.8120 - val_binary_accuracy: 0.8540 - val_loss: 0.3826
+Epoch 52/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9915 - binary_accuracy: 0.9835 - loss: 0.1005 
+Epoch 52: saving model to ./model/proposedModal/weights_epoch_52.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9915 - binary_accuracy: 0.9835 - loss: 0.1006 - val_AUC: 0.8012 - val_binary_accuracy: 0.8589 - val_loss: 0.3750
+Epoch 53/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9921 - binary_accuracy: 0.9806 - loss: 0.1005
+Epoch 53: saving model to ./model/proposedModal/weights_epoch_53.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9921 - binary_accuracy: 0.9806 - loss: 0.1006 - val_AUC: 0.7813 - val_binary_accuracy: 0.8716 - val_loss: 0.3643
+Epoch 54/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9953 - binary_accuracy: 0.9817 - loss: 0.0985
+Epoch 54: saving model to ./model/proposedModal/weights_epoch_54.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9952 - binary_accuracy: 0.9816 - loss: 0.0986 - val_AUC: 0.8126 - val_binary_accuracy: 0.8452 - val_loss: 0.4122
+Epoch 55/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9925 - binary_accuracy: 0.9788 - loss: 0.1041
+Epoch 55: saving model to ./model/proposedModal/weights_epoch_55.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9925 - binary_accuracy: 0.9788 - loss: 0.1041 - val_AUC: 0.7977 - val_binary_accuracy: 0.7710 - val_loss: 0.5307
+Epoch 56/100
+113/114 ━━━━━━━━━━━━━━━━━━━━ 0s 62ms/step - AUC: 0.9947 - binary_accuracy: 0.9819 - loss: 0.0961 
+Epoch 56: saving model to ./model/proposedModal/weights_epoch_56.weights.h5
+114/114 ━━━━━━━━━━━━━━━━━━━━ 8s 71ms/step - AUC: 0.9947 - binary_accuracy: 0.9819 - loss: 0.0961 - val_AUC: 0.8044 - val_binary_accuracy: 0.8745 - val_loss: 0.3513
+✅ Model weights are stored in: ./model/proposedModal/20250227-164825/final_model.weights.h5
+
+
+
+
+❯ python modal_evaluate.py
+✅ Test dataset loaded successfully!
+✅ Model parameters loaded: n_shot_types=20, n_area_types=15
+2025-02-27 16:54:00.424094: I metal_plugin/src/device/metal_device.cc:1154] Metal device set to: Apple M1
+2025-02-27 16:54:00.424119: I metal_plugin/src/device/metal_device.cc:296] systemMemory: 16.00 GB
+2025-02-27 16:54:00.424124: I metal_plugin/src/device/metal_device.cc:313] maxCacheSize: 5.33 GB
+2025-02-27 16:54:00.424140: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:305] Could not identify NUMA node of platform GPU ID 0, defaulting to 0. Your kernel may not have been built with NUMA support.
+2025-02-27 16:54:00.424151: I tensorflow/core/common_runtime/pluggable_device/pluggable_device_factory.cc:271] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 0 MB memory) -> physical PluggableDevice (device: 0, name: METAL, pci bus id: <undefined>)
+/Users/yenhsin/miniforge3/envs/tf_m1/lib/python3.9/site-packages/keras/src/saving/saving_lib.py:757: UserWarning: Skipping variable loading for optimizer 'adam', because it has 2 variables whereas the saved optimizer has 54 variables. 
+  saveable.load_own_variables(weights_store.get(inner_path))
+✅ Model weights loaded successfully: ./model/proposedModal/20250227-164825/final_model.weights.h5
+2025-02-27 16:54:00.936529: I tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.cc:117] Plugin optimizer for device_type GPU is enabled.
+65/65 ━━━━━━━━━━━━━━━━━━━━ 2s 17ms/step - AUC: 0.7168 - binary_accuracy: 0.9089 - loss: 0.3253  
+65/65 ━━━━━━━━━━━━━━━━━━━━ 1s 13ms/step  
+✅ Testing completed!AUC: 0.7168205976486206, Accuracy: 0.9118792414665222, Brier Score: 0.07272609910713981
