@@ -33,15 +33,18 @@ def prepare_data(dataset: pd.DataFrame,
     """Convert dataset to appropriate format for training."""
     shots = []
     rallies = []
+    rally_ids = []
     shot_attributes_f = util.flatten(shot_attributes)
     rally_attributes_f = util.flatten(rally_attributes)
-    
+    dataset_copy = dataset.copy()
+
     # Generate sequences of rallies
-    for rally_id, rally in dataset.groupby(["match_id", "rally_id","set_id"]):
+    for rally_id, rally in dataset_copy.groupby("rally_id"):
         if min_len > 0 and len(rally) < min_len:
             continue
         shots.append(rally[shot_attributes_f].values.astype('float32'))
-        rallies.append(rally[rally_attributes_f].values[-1].astype('float32'))
+        rallies.append(rally[rally_attributes_f].values[-1].astype('float32')) 
+        rally_ids.append(rally["rally_id"].values[-1])
         # Force non-target's sequence starts at second step
         pad = ((0, pad_to - len(rally)) if rally['is_target_turn'].iloc[0]
                else (1, pad_to - len(rally) - 1))
@@ -62,4 +65,4 @@ def prepare_data(dataset: pd.DataFrame,
         for i in range(len(rallies)):
             if rally_attributes_len[i] == 1:
                 rallies[i] = rallies[i][:, 0]
-    return (shots, rallies)
+    return (shots, rallies, rally_ids)

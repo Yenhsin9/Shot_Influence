@@ -21,7 +21,8 @@ def load_all_sets(set_folder):
                     df = pd.read_csv(file_path)
                     df["match_id"] = match_id  
                     df["set_id"]=set_id
-                    df = df.rename(columns={"rally":"rally_id"})
+                    df["rally"] = df["rally"].astype(str)
+                    df["rally_id"] = df["match_id"].astype(str) + "_" + df["set_id"].astype(str) + "_" + df["rally"]
                     all_data.append(df)
 
     if all_data:

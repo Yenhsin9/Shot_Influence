@@ -5,7 +5,6 @@ def To_Second(time):
     pd.to_datetime(time, format="%H:%M:%S").dt.second)
 
 def process_dataset(dataset, output_file):
-
     # roundscore_diff
     dataset['roundscore_diff'] = dataset['roundscore_B'] - dataset['roundscore_A']
     
@@ -14,7 +13,7 @@ def process_dataset(dataset, output_file):
     continuous_count = 0
 
     for i in range(len(dataset)):
-        if dataset.loc[i, "rally_id"] ==1:
+        if dataset.loc[i, "rally"] ==1:
             continuous_count = 0
         if dataset.loc[i, "getpoint_player"] == "B":
             continuous_count += 1
@@ -24,6 +23,7 @@ def process_dataset(dataset, output_file):
     
     #is_target_win 
     dataset['is_target_win'] = (dataset['getpoint_player'] == 'B').astype(float)
+    dataset["is_target_win"] = dataset.groupby("rally_id")["is_target_win"].transform("last")
 
     # is_target_turn 
     dataset["is_target_turn"] = (dataset["player"] == "B").astype(float)
@@ -36,7 +36,7 @@ def process_dataset(dataset, output_file):
                   pd.to_datetime(dataset["time"], format="%H:%M:%S").dt.minute * 60 + \
                   pd.to_datetime(dataset["time"], format="%H:%M:%S").dt.second
 
-    dataset["time_proportion"] = dataset.groupby(["match_id", "rally_id","set_id"])["time"].transform(
+    dataset["time_proportion"] = dataset.groupby(["rally_id"])["time"].transform(
     lambda x: (x - x.min()) / (x.max() - x.min()) if x.max() != x.min() else 0)
 
     dataset.fillna(0, inplace=True)  # fill nan to 0

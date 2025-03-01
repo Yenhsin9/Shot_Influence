@@ -9,31 +9,25 @@ from keras_transformer import get_encoders
 from keras_transformer.gelu import gelu
 from tensorflow.keras.layers import MultiHeadAttention, Dense, LayerNormalization, Dropout, Embedding
 from custom_layers import StaggeredConv1D
+import tensorflow.keras.activations as activations
 
 def preprocess_inputs(shot_sequence_shape, rally_info_shape,
                       embed_types_size=None, embed_area_size=None, embed_player_size=None):
     """Preprocess input encoding: Input + Embedding + Concatenation + Masking"""
-
     # ✅ Input Layers
+    input_shots = tf.keras.Input(shape=shot_sequence_shape, name='Shots_input')  # (None, seq_len, 2)
+    input_shot_types = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Shot_types_input')
+    input_time_proportion = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Time_proportion_input')
     input_hit_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Hit_area_input')
     input_player_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Player_area_input')
     input_opponent_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Opponent_area_input')
-    input_shots = tf.keras.Input(shape=shot_sequence_shape, name='Shots_input')  # (None, seq_len, 3)
-    input_shot_types = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Shot_types_input')
-    input_time_proportion = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Time_proportion_input')
+    input_player_id = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Player_input')
     input_rally = tf.keras.Input(shape=(rally_info_shape,), name='Rally_input')
-    input_player_id = tf.keras.Input(shape=(1,), name='Player_input')  # ✅ Player ID Input
 
     # ✅ Player Embedding
     if embed_player_size is not None:
         player_embedding = tf.keras.layers.Embedding(input_dim=embed_player_size, output_dim=15, mask_zero=True, name='Player_embedding')
-        embedded_player = player_embedding(input_player_id)  # (None, 1, 15)
-        embedded_player = tf.keras.layers.Lambda(lambda x: tf.squeeze(x, axis=1))(embedded_player)  # (None, 15)
-        embedded_player = tf.keras.layers.RepeatVector(shot_sequence_shape[0])(embedded_player)  # (None, 66, 15)
-    else:
-        embedded_player = tf.keras.layers.Lambda(lambda x: tf.cast(x, tf.float32))(input_player_id)  
-        embedded_player = tf.keras.layers.Lambda(lambda x: tf.squeeze(x, axis=1))(embedded_player)  # (None, 15)
-        embedded_player = tf.keras.layers.RepeatVector(shot_sequence_shape[0])(embedded_player)  # (None, 66, 15)
+        embedded_player = player_embedding(input_player_id)  # (None, 66, 15)
 
     # ✅ Location Embedding (Hit Area, Player Area, Opponent Area)
     if embed_area_size is not None:
@@ -56,26 +50,27 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
         tiled_time_proportion = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(input_time_proportion)
         tiled_time_proportion = tf.keras.layers.Lambda(lambda x: tf.tile(x, [1, 1, 15]))(tiled_time_proportion)
 
-        time_mu_proportion = tf.keras.layers.Multiply(name='Time_proportion_multiply')([shot_mu_embedding(input_shot_types), tiled_time_proportion])
+        # μn * τn
+        time_mu_proportion = tf.keras.layers.Multiply(name='Time_proportion_multiply')([shot_mu_embedding(input_shot_types), tiled_time_proportion]) 
+        # θn + μn * τn
         temporal_score = tf.keras.layers.Add(name='Time_proportion_add')([shot_theta_embedding(input_shot_types), time_mu_proportion])
+        # δn = sigmoid(θn + μn * τn)
         temporal_score = tf.keras.layers.Activation('sigmoid', name='Time_activation')(temporal_score)
 
         enhanced_shot_features = tf.keras.layers.Multiply(name='Shots_time_multiply')([temporal_score, embedded_shot_types])
-        enhanced_shot_features = tf.keras.layers.Concatenate(name='Shots_features_merging')([enhanced_shot_features, input_shots])
     else:
         enhanced_shot_features = input_shots
 
     # ✅ **Concatenate Player Embedding, Location Embedding, and Enhanced Shot Features (Shot Encoder Output)**
     shot_encoder_output = tf.keras.layers.Concatenate(name='Shot_encoder_output')([
-        embedded_hit_area, embedded_player_area, embedded_opponent_area, enhanced_shot_features, embedded_player
+        embedded_hit_area, embedded_player_area, embedded_opponent_area, enhanced_shot_features, embedded_player,input_shots
     ])
-
     # ✅ Masking Layer
     layer_masking = tf.keras.layers.Masking(name='Sequence_masking')
     masked_sequence = layer_masking(shot_encoder_output)
 
-    return [input_player_id, input_hit_area, input_player_area, input_opponent_area, input_shots,
-            input_shot_types, input_time_proportion, input_rally], masked_sequence
+    return [input_shots,input_shot_types,input_player_id,input_time_proportion, input_hit_area, input_player_area, input_opponent_area, 
+              input_rally], masked_sequence
 
 
 # Proposed modal: CNN + Position + Mutihead Attention
@@ -109,8 +104,10 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     attn_output = LayerNormalization(epsilon=1e-6)(attn_output + pattern_sequence_with_pos)
 
     # ✅ Feed Forward Network
-    ffn = Dense(transformer_kwargs['inner_dim'], activation='relu')(attn_output)  # Expand to `inner_dim`
+    ffn = Dense(transformer_kwargs['inner_dim'], activation=activations.gelu)(attn_output)  # Expand to `inner_dim`
+    ffn = Dropout(0.5)(ffn)
     ffn_output = Dense(transformer_kwargs['ff_dim'])(ffn)  # Reduce back to `ff_dim`
+    ffn_output = Dropout(0.5)(ffn_output)
     transformer_output = LayerNormalization(epsilon=1e-6)(ffn_output + attn_output)
 
     # ✅ Max Pooling
