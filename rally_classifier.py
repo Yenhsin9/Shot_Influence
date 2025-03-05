@@ -117,8 +117,10 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     layer_concat_rally = tf.keras.layers.Concatenate(name='Seq_rally_merging')([rally_representation, inputs[-1]])
 
     # ✅ Final Dense Layer
-    output_win_prob = Dense(units=1, activation='sigmoid', **dense_kwargs)(layer_concat_rally)
+    fc_layer = Dense(16, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01))(layer_concat_rally)
+    fc_layer = Dropout(0.5)(fc_layer)
 
+    output_win_prob = Dense(1, activation='sigmoid')(fc_layer)
     model_predict = tf.keras.Model(inputs=inputs, outputs=output_win_prob)
     return model_predict
 
