@@ -33,24 +33,79 @@ def prepare_data(dataset: pd.DataFrame,
     """Convert dataset to appropriate format for training."""
     shots = []
     rallies = []
-    rally_ids = []
+    masks=[]
+
     shot_attributes_f = util.flatten(shot_attributes)
     rally_attributes_f = util.flatten(rally_attributes)
-    dataset_copy = dataset.copy()
 
-    # Generate sequences of rallies
-    for rally_id, rally in dataset_copy.groupby("rally_id"):
+    pre_setid = None
+    consecutive_points = 0
+    last_getpoint_player = None
+    for rally_id, rally in dataset.groupby('rally_id'):
         if min_len > 0 and len(rally) < min_len:
             continue
+        
+        # ====== (Time Proportion) ======
+        rally['time_proportion'] = np.linspace(0, 1, len(rally))
+
+        getpoint_player = rally['getpoint_player'].iloc[-1]
+        # ====== (Score Difference) ======
+        setid = rally['set'].iloc[-1]
+        score_A = rally['roundscore_A'].iloc[-1]
+        score_B = rally['roundscore_B'].iloc[-1]
+
+        if setid != pre_setid:
+            prev_score_A = 0
+            prev_score_B = 0
+            score_diff = 0
+        else:
+            if score_A > prev_score_A and score_B == prev_score_B: 
+                score_diff = score_A - score_B
+            elif score_B > prev_score_B and score_A == prev_score_A:  
+                score_diff = score_B - score_A
+            else:
+                score_diff = 0  
+
+        prev_score_A = score_A
+        prev_score_B = score_B
+        rally['roundscore_diff'] = score_diff
+            
+         # (Consecutive Points)
+        if setid != pre_setid: 
+            last_getpoint_player = None
+            consecutive_points = 1
+        else:
+            if getpoint_player == last_getpoint_player:
+                consecutive_points += 1
+            else:
+                consecutive_points = 1 
+
+        last_getpoint_player = getpoint_player
+        rally['consecutive_points'] = consecutive_points
+        pre_setid = setid
+
+        if 'time_proportion' not in shot_attributes_f:
+            shot_attributes_f.append('time_proportion')
+        if 'roundscore_diff' not in rally_attributes_f:
+            rally_attributes_f.append('roundscore_diff')
+        if 'consecutive_points' not in rally_attributes_f:
+            rally_attributes_f.append('consecutive_points')
+
         shots.append(rally[shot_attributes_f].values.astype('float32'))
-        rallies.append(rally[rally_attributes_f].values[-1].astype('float32')) 
-        rally_ids.append(rally["rally_id"].values[-1])
-        # Force non-target's sequence starts at second step
-        pad = ((0, pad_to - len(rally)) if rally['is_target_turn'].iloc[0]
-               else (1, pad_to - len(rally) - 1))
-        shots[-1] = np.pad(shots[-1], [pad, (0, 0)])
+        rally_features = rally[rally_attributes_f].values[-1].astype('float32')
+        rallies.append(rally_features)
+
+        # ====== (Padding) ======
+        pad = ((0, pad_to - len(rally)), (0, 0))
+        shots[-1] = np.pad(shots[-1], pad, mode='constant', constant_values=0)
+        # creating mask
+        # 對整個 batch 的數據生成遮罩
+        mask = np.any(shots[-1] != 0, axis=-1).astype(np.float32)
+        masks.append(mask)
+
     shots = np.asarray(shots)
     rallies = np.asarray(rallies)
+    masks = np.asarray(masks)
     # Split back to input specification
     shot_attributes_len = util.list_len(shot_attributes)
     if len(shot_attributes_len) > 1:
@@ -65,4 +120,4 @@ def prepare_data(dataset: pd.DataFrame,
         for i in range(len(rallies)):
             if rally_attributes_len[i] == 1:
                 rallies[i] = rallies[i][:, 0]
-    return (shots, rallies, rally_ids)
+    return (shots, rallies,masks)

@@ -8,61 +8,49 @@ import util
 import os
 import glob
 from sklearn.model_selection import train_test_split
+from tensorflow.keras.callbacks import Callback
+
+# Timestamp for model saving
 timestr = time.strftime("%Y%m%d-%H%M%S")
 
-dataset = pd.read_csv('new_data/dataset.csv')
+# Load data
+train_data = pd.read_csv('./data/train.csv')
+val_given_data = pd.read_csv('./data/val_given.csv')
+val_gt_data = pd.read_csv('./data/val_gt.csv')
 
-encode_columns = []
-shot_predictors = ['player_id','time_proportion', 'backhand', 'aroundhead','hit_area', 'player_location_area', 'opponent_location_area',"type"]
-rally_predictors = ['roundscore_diff', 'continuous_score']
+print(f"Train data shape: {train_data.shape}")
+print(f"Validation data shape: {val_given_data.shape}, GT: {val_gt_data.shape}")
+
+# ✅ Data preprocessing parameters
+shot_predictors = ['player', 'type', 'backhand', 'aroundhead', 
+                   'hit_area', 'player_location_area', 'opponent_location_area']
+rally_predictors = ['roundscore_diff', 'consecutive_points']  
 target = 'is_target_win'
 
 # ✅ Find largest seq len for padding
-seq_len = dataset.groupby("rally_id").size().max()
-seq_len += 1 if seq_len % 2 == 1 else 2
+seq_len = train_data.groupby('rally_id').size().max()
+seq_len += 1 if seq_len % 2 == 1 else 2 
 
-# ✅ One-Hot Encoding
-encoded = pd.get_dummies(dataset, columns=encode_columns)
-codes_type, uniques_type = pd.factorize(encoded['type'])
-encoded['type'] = codes_type + 1  # Reserve 0 for padding
+# ✅ Encode 'type' column
+codes_type, uniques_type = pd.factorize(train_data['type'])
+train_data['type'] = codes_type + 1  
+val_given_data['type'] = val_given_data['type'].apply(
+    lambda x: (uniques_type.tolist().index(x) + 1) if x in uniques_type else 0
+)
 
-shot_predictors = [c for c in encoded.columns if any(c.startswith(f'{p}_') for p in shot_predictors) or c in shot_predictors]
-
-# 80/10/10
-unique_rallies = encoded["rally_id"].drop_duplicates()
-
-train_rally, val_test_rally = train_test_split(unique_rallies, test_size=0.2, random_state=42)
-
-val_rally, test_rally = train_test_split(val_test_rally, test_size=0.5, random_state=42)
-
-print(f"📊 Train Rally: {len(train_rally)}, Val Rally: {len(val_rally)}, Test Rally: {len(test_rally)}")
-
-train_data = encoded.merge(train_rally, on= "rally_id")
-val_data = encoded.merge(val_rally, on="rally_id")
-test_data = encoded.merge(test_rally, on= "rally_id")
-
-print(f"📊 Train: {len(train_data)}, Val: {len(val_data)}, Test: {len(test_data)}")
-
-# ✅ save data
-test_data.to_csv("./split_data/test_data.csv", index=False)
-train_data.to_csv("./split_data/train_data.csv", index=False)
-val_data.to_csv("./split_data/val_data.csv", index=False)
-print("✅ dataset saved successfully!")
-
-(train_shots), (train_rallies, train_target),train_rally_id = train.prepare_data(
+(train_shots), (train_rallies, train_target,train_rally_id)= train.prepare_data(
     train_data, 
     [shot_predictors], 
-    [rally_predictors, target],  
+    [rally_predictors,target,'rally_id'],
     pad_to=seq_len
 )
 
-(val_shots), (val_rallies, val_target),val_rally_id = train.prepare_data(
-    val_data, 
+(val_shots), (val_rallies, val_target,val_rally_id) = train.prepare_data(
+    val_given_data, 
     [shot_predictors], 
-    [rally_predictors, target],  
+    [rally_predictors,target,'rally_id'],
     pad_to=seq_len
 )
-
 seq_len = train_shots.shape[1]
 
 train_player_id = train_shots[:, :, 0].copy()
@@ -84,10 +72,10 @@ indices_to_delete = [0, 1, 4, 5, 6, 7]
 val_shots = np.delete(val_shots, indices_to_delete, axis=2)
 
 # ✅ Set model hyperparameters
-regularizer = tf.keras.regularizers.l2(0.1)
+regularizer = tf.keras.regularizers.l2(0.01)
 loss = 'binary_crossentropy'
 metrics = ['AUC', 'binary_accuracy']
-epochs = 100
+epochs = 20
 
 MODEL_DIR = "./model/"
 MODEL_NAME = "proposedModal"  
@@ -95,8 +83,9 @@ MODEL_PATH = os.path.join(MODEL_DIR, MODEL_NAME)
 os.makedirs(MODEL_PATH, exist_ok=True)
 
 n_shot_types = len(uniques_type) + 1
-n_area_types = encoded['player_location_area'].nunique() + 1
-n_player_types = encoded['player_id'].nunique() + 1  
+n_area_types = max(train_data['player_location_area'].nunique(), 
+                   train_data['opponent_location_area'].nunique()) + 1  
+n_player_types = train_data['player'].nunique() + 1  
 cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': regularizer, 'activation': 'relu'}
 transformer_kwargs = {
     'num_heads': 1,  # Reduce heads to match paper
@@ -106,7 +95,7 @@ transformer_kwargs = {
 }
 dense_kwargs = {'kernel_regularizer': regularizer}
 batch_size = 32
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)  
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, clipnorm=1.0)  
 
 import json
 param_dict = {
@@ -155,7 +144,47 @@ checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     verbose=1
 )
 
-callbacks = tf.keras.callbacks.EarlyStopping(min_delta=0.001, patience=15, restore_best_weights=True),
+class EpochDebugCallback(Callback):
+    def __init__(self, train_data, train_labels, val_data, val_labels, batch_size=32):
+        super().__init__()
+        self.train_data = train_data
+        self.train_labels = tf.reshape(train_labels, (-1, 1))  # 調整標籤數據形狀
+        self.val_data = val_data
+        self.val_labels = tf.reshape(val_labels, (-1, 1))  # 同樣調整驗證數據形狀
+        self.batch_size = batch_size
+
+    def on_epoch_end(self, epoch, logs=None):
+        print(f"\n🌀 Epoch {epoch + 1} 結束，評估模型...")
+
+        # 使用 GradientTape 手動計算梯度
+        with tf.GradientTape() as tape:
+            predictions = self.model(self.train_data, training=True)
+            loss = self.model.compiled_loss(self.train_labels, predictions)
+
+        # 計算梯度
+        gradients = tape.gradient(loss, self.model.trainable_weights)
+        
+        # 輸出每層的梯度平均值
+        for weight, grad in zip(self.model.trainable_weights, gradients):
+            if grad is not None:
+                tf.print(f'🔍 Layer: {weight.name}, Gradient mean: {tf.reduce_mean(tf.abs(grad))}')
+            else:
+                tf.print(f'⚠️ Layer: {weight.name}, Gradient is None')
+
+        # 訓練集預測值和 loss
+        train_pred = self.model.predict(self.train_data, batch_size=self.batch_size)
+        train_loss = tf.keras.losses.binary_crossentropy(self.train_labels, train_pred)
+        print(f"📊 訓練集預測值範圍: {train_pred.min():.4f} - {train_pred.max():.4f}, 預測均值: {train_pred.mean():.4f}")
+        print(f"🧮 訓練集手動計算的 binary_crossentropy loss: {tf.reduce_mean(train_loss).numpy():.4f}")
+
+        # 驗證集預測值和 loss
+        val_pred = self.model.predict(self.val_data, batch_size=self.batch_size)
+        val_loss = tf.keras.losses.binary_crossentropy(self.val_labels, val_pred)
+        print(f"📊 驗證集預測值範圍: {val_pred.min():.4f} - {val_pred.max():.4f}, 預測均值: {val_pred.mean():.4f}")
+        print(f"🧮 驗證集手動計算的 binary_crossentropy loss: {tf.reduce_mean(val_loss).numpy():.4f}")
+        print(f"📝 Keras 記錄的 Loss: {logs['loss']:.4f}, Val Loss: {logs['val_loss']:.4f}")
+
+
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir='./history/', histogram_freq=1)
 # ✅ find all `.weights.h5` file
 checkpoint_files = glob.glob(os.path.join(MODEL_PATH, "weights_epoch_*.weights.h5"))
@@ -172,16 +201,27 @@ else:
     initial_epoch = 0  
 
 print("🔥🔥🔥 Start training！")
-
 history = prediction_model.fit(train_x, train_target,
                                validation_data=(val_x, val_target),
                                epochs=epochs, 
                                initial_epoch=initial_epoch,  
                                batch_size=batch_size,
-                               callbacks=callbacks)
+                               callbacks=[EpochDebugCallback(train_x,train_target,val_x,val_target)])
 
 # 取得模型對訓練集的預測結果
 y_pred_train = prediction_model.predict(train_x)
+y_pred_val = prediction_model.predict(val_x)
+
+# 查看模型預測值的分佈情況
+import matplotlib.pyplot as plt
+
+plt.hist(y_pred_train.flatten(), bins=50)
+plt.xlabel("預測值 (Predicted Probability)")
+plt.ylabel("頻率 (Frequency)")
+plt.title("模型初始預測值分佈")
+plt.show()
+
+# 如果預測值大部分集中在 0 或 1，會看到分佈圖兩端有很高的頻率
 
 # 建立 DataFrame，存儲預測與實際值
 rally_predictions_train = pd.DataFrame({
