@@ -4,19 +4,16 @@ import tensorflow as tf
 import rally_classifier as rc
 import train
 import matplotlib.pyplot as plt
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint,Callback
 import os
-from tensorflow.keras.callbacks import Callback
-import numpy as np
 import csv
+
 # Load Data
 train_data = pd.read_csv('./data/train.csv')
-val_given_data = pd.read_csv('./data/val_given.csv')
-val_gt_data = pd.read_csv('./data/val_gt.csv')
+val_data = pd.read_csv('./data/val.csv')
 
 print(f"Train data shape: {train_data.shape}")
-print(f"Validation data shape: {val_given_data.shape}")
-print(f"GT Validation data shape: {val_gt_data.shape}")
+print(f"Validation data shape: {val_data.shape}")
 
 # Data Preprocessing
 shot_predictors = ['type', 'backhand', 'aroundhead', 
@@ -27,18 +24,20 @@ target = 'is_target_win'
 seq_len = train_data.groupby('rally_id').size().max()
 seq_len += 1 if seq_len % 2 == 1 else 2 
 
-# Encode 'type' and 'player' columns
-codes_type, uniques_type = pd.factorize(train_data['type'])
-train_data['type'] = codes_type + 1
-val_given_data['type'] = val_given_data['type'].apply(
-    lambda x: (uniques_type.tolist().index(x) + 1) if x in uniques_type else 0
+# Encode 'type' columns
+codes_train, uniques_train = pd.factorize(train_data['type'])
+train_data['type'] = codes_train + 1  
+# Create a category correspondence table for train_data
+type_mapping = {name: idx+1 for idx, name in enumerate(uniques_train.tolist())}
+
+# Let the new categories of val_data also get unique codes
+# ensuring that the same categories get the same number
+next_id = len(type_mapping) + 1 
+val_data['type'] = val_data['type'].apply(
+    lambda x: type_mapping.setdefault(x, next_id + len(type_mapping))
 )
 
-codes_player, uniques_player = pd.factorize(train_data['player'])
-train_data['player'] = codes_player + 1
-val_given_data['player'] = val_given_data['player'].apply(
-    lambda x: (uniques_player.tolist().index(x) + 1) if x in uniques_player else 0
-)
+print("Category correspondence table:", type_mapping)
 
 # Prepare Data
 (train_shots), (train_rallies, train_target,train_rally_id),train_masks= train.prepare_data(
@@ -49,14 +48,13 @@ val_given_data['player'] = val_given_data['player'].apply(
 )
 
 (val_shots), (val_rallies, val_target,val_rally_id),val_masks = train.prepare_data(
-    val_given_data, 
+    val_data, 
     [shot_predictors], 
     [rally_predictors,target,'rally_id'],
     pad_to=seq_len
 )
 
 seq_len = train_shots.shape[1]
-
 train_player_id = train_shots[:, :, 6].copy()
 train_shot_type = train_shots[:, :, 0].copy()
 train_hit_area = train_shots[:, :, 3].copy()
@@ -78,21 +76,24 @@ val_shots = np.delete(val_shots, indices_to_delete, axis=2)
 # Model Hyperparameters
 cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
 transformer_kwargs = {
-    'num_heads': 2,  
-    'key_dim': 32,  
+    'num_heads': 1,  
+    'key_dim':32,  
     'ff_dim': 32,  
     'inner_dim': 64  
 }
-regularizer = tf.keras.regularizers.l2(0.01)
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, clipnorm=1.0)
+
+#input data
 train_x = [train_shots, train_shot_type, train_player_id,train_time_proportion,train_hit_area ,train_player_area, train_opponent_area,train_rallies,train_masks]
 val_x = [val_shots, val_shot_type,val_player_id,val_time_proportion,val_hit_area ,val_player_area,val_opponent_area, val_rallies,val_masks]
+
 # Build the Model
 model = rc.proposed_model(
     (seq_len, train_shots.shape[2]),
-    embed_types_size=len(uniques_type) + 1,
-    embed_area_size=max(train_data['player_location_area'].nunique(), train_data['opponent_location_area'].nunique()) + 1,  
-    embed_player_size=len(uniques_player) + 1,  
+    embed_types_size=len(type_mapping) + 1,
+    embed_area_size=max(train_data['player_location_area'].nunique(), train_data['opponent_location_area'].nunique(),train_data['hit_area'].nunique()
+                        ,val_data['player_location_area'].nunique(), val_data['opponent_location_area'].nunique(),val_data['hit_area'].nunique()) + 1,  
+    embed_player_size=27,
     rally_info_shape=len(rally_predictors),
     cnn_kwargs=cnn_kwargs,
     transformer_kwargs=transformer_kwargs,
@@ -106,7 +107,7 @@ if os.path.exists(model_path):
     os.remove(model_path)  
 
 callbacks = [
-    EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),
+    EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True),
     ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True, save_weights_only=False),
     # shot_encoder_callback
 ]
@@ -119,7 +120,7 @@ history = model.fit(
     batch_size=32,
     verbose=1,
     callbacks=callbacks,
-    #shuffle=False
+    shuffle=True
 )
 
 
@@ -131,9 +132,26 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
 plt.title('Training and Validation Loss Over Epochs')
+
+# 獲取 AUC 數據
+train_auc = history.history['AUC']  # 訓練集 AUC
+val_auc = history.history['val_AUC']  # 驗證集 AUC
+
+epochs = range(1, len(train_auc) + 1)  # Epoch 數
+
+# 繪製 AUC 曲線
+plt.figure(figsize=(8, 6))
+plt.plot(epochs, train_auc, label='Train AUC', marker='o', linestyle='-')
+plt.plot(epochs, val_auc, label='Validation AUC', marker='s', linestyle='--')
+
+# 圖表標題 & 標籤
+plt.title('Train vs Validation AUC Over Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('AUC')
+plt.legend()
+plt.grid()
+
 plt.show()
-
-
 
 # import tensorflow as tf
 # from tensorflow.keras.callbacks import Callback
@@ -177,3 +195,12 @@ plt.show()
 #     output_file='+Tile_mask_for_heads.csv',
 #     batch_limit=5  # 只保存前 5 個 batch
 # )
+
+# import pandas as pd
+# # 假設 train_shots 形狀是 (batch_size, seq_len, 8)
+# batch_size, seq_len, feature_dim = train_shots.shape
+# flat_shots = train_shots.reshape(-1, feature_dim)
+# df_shots = pd.DataFrame(flat_shots)
+# # 將 DataFrame 保存為 CSV 文件，每一行表示 8 個特徵
+# df_shots.to_csv("train_shots.csv", index=False,header=False)
+# print("train_shots 已成功保存到 train_shots.csv")

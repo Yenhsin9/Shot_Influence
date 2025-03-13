@@ -100,7 +100,7 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     # ✅ CNN Feature Extraction with Masking
     layer_cnn = StaggeredConv1D(name='Local_pattern_extraction', **cnn_kwargs)
     pattern_sequence = layer_cnn(shot_encoder_output, mask=inputs[-1])
-    pattern_sequence = tf.keras.layers.Dropout(0.3)(pattern_sequence) 
+    pattern_sequence = tf.keras.layers.Dropout(0.5)(pattern_sequence) 
 
     # ✅ Positional Encoding
     seq_len = shot_sequence_shape[0]
@@ -129,7 +129,7 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
         name='Tile_mask_for_heads'
     )(mask)
 
-    mha = MultiHeadAttention(num_heads=num_heads, key_dim=transformer_kwargs['key_dim'])
+    mha = MultiHeadAttention(num_heads=num_heads, key_dim=transformer_kwargs['key_dim'],kernel_regularizer=l2(0.01),dropout=0.3)
     attn_output, attn_weights = mha(
         pattern_sequence_with_pos, 
         pattern_sequence_with_pos, 

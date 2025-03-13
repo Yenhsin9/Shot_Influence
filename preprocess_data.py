@@ -264,10 +264,8 @@ class CoachAITrainTestSplit:
 
         # output to csv
         match_train.to_csv(f"{path}train.csv", index=False)
-        match_test[match_test['ball_round'].isin([_ for _ in range(self.given_strokes_num+1)])].to_csv(f"{path}test_given.csv", index=False)
-        match_val[match_val['ball_round'].isin([_ for _ in range(self.given_strokes_num+1)])].to_csv(f"{path}val_given.csv", index=False)
-        match_test[~match_test['ball_round'].isin([_ for _ in range(self.given_strokes_num+1)])][['rally_id', 'ball_round', 'type', 'landing_x', 'landing_y']].to_csv(f"{path}test_gt.csv", index=False)
-        match_val[~match_val['ball_round'].isin([_ for _ in range(self.given_strokes_num+1)])][['rally_id', 'ball_round', 'type', 'landing_x', 'landing_y']].to_csv(f"{path}val_gt.csv", index=False)
+        match_val.to_csv(f"{path}val.csv", index=False)
+        match_test.to_csv(f"{path}test.csv", index=False)
 
     def preprocess_files(self, match):
         def flatten(t):
