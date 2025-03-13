@@ -1,247 +1,189 @@
-import time
-import numpy as np
 import pandas as pd
+import numpy as np
 import tensorflow as tf
 import rally_classifier as rc
 import train
-import util
+import matplotlib.pyplot as plt
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint,Callback
 import os
-import glob
-from sklearn.model_selection import train_test_split
-from tensorflow.keras.callbacks import Callback
+import csv
 
-# Timestamp for model saving
-timestr = time.strftime("%Y%m%d-%H%M%S")
-
-# Load data
+# Load Data
 train_data = pd.read_csv('./data/train.csv')
-val_given_data = pd.read_csv('./data/val_given.csv')
-val_gt_data = pd.read_csv('./data/val_gt.csv')
+val_data = pd.read_csv('./data/val.csv')
 
 print(f"Train data shape: {train_data.shape}")
-print(f"Validation data shape: {val_given_data.shape}, GT: {val_gt_data.shape}")
+print(f"Validation data shape: {val_data.shape}")
 
-# ✅ Data preprocessing parameters
-shot_predictors = ['player', 'type', 'backhand', 'aroundhead', 
-                   'hit_area', 'player_location_area', 'opponent_location_area']
+# Data Preprocessing
+shot_predictors = ['type', 'backhand', 'aroundhead', 
+                   'hit_area', 'player_location_area', 'opponent_location_area', 'player']
 rally_predictors = ['roundscore_diff', 'consecutive_points']  
 target = 'is_target_win'
 
-# ✅ Find largest seq len for padding
 seq_len = train_data.groupby('rally_id').size().max()
 seq_len += 1 if seq_len % 2 == 1 else 2 
 
-# ✅ Encode 'type' column
-codes_type, uniques_type = pd.factorize(train_data['type'])
-train_data['type'] = codes_type + 1  
-val_given_data['type'] = val_given_data['type'].apply(
-    lambda x: (uniques_type.tolist().index(x) + 1) if x in uniques_type else 0
+# Encode 'type' columns
+codes_train, uniques_train = pd.factorize(train_data['type'])
+train_data['type'] = codes_train + 1  
+# Create a category correspondence table for train_data
+type_mapping = {name: idx+1 for idx, name in enumerate(uniques_train.tolist())}
+
+# Let the new categories of val_data also get unique codes
+# ensuring that the same categories get the same number
+next_id = len(type_mapping) + 1 
+val_data['type'] = val_data['type'].apply(
+    lambda x: type_mapping.setdefault(x, next_id + len(type_mapping))
 )
 
-(train_shots), (train_rallies, train_target,train_rally_id)= train.prepare_data(
+print("Category correspondence table:", type_mapping)
+
+# Prepare Data
+(train_shots), (train_rallies, train_target,train_rally_id),train_masks= train.prepare_data(
     train_data, 
     [shot_predictors], 
     [rally_predictors,target,'rally_id'],
     pad_to=seq_len
 )
 
-(val_shots), (val_rallies, val_target,val_rally_id) = train.prepare_data(
-    val_given_data, 
+(val_shots), (val_rallies, val_target,val_rally_id),val_masks = train.prepare_data(
+    val_data, 
     [shot_predictors], 
     [rally_predictors,target,'rally_id'],
     pad_to=seq_len
 )
-seq_len = train_shots.shape[1]
 
-train_player_id = train_shots[:, :, 0].copy()
-train_time_proportion = train_shots[:, :, 1].copy()
-train_hit_area = train_shots[:, :, 4].copy()
-train_player_area = train_shots[:, :, 5].copy()
-train_opponent_area = train_shots[:, :, 6].copy()
-train_shot_type = train_shots[:, :, 7].copy()
-indices_to_delete = [0, 1, 4, 5, 6, 7]  
+seq_len = train_shots.shape[1]
+train_player_id = train_shots[:, :, 6].copy()
+train_shot_type = train_shots[:, :, 0].copy()
+train_hit_area = train_shots[:, :, 3].copy()
+train_player_area = train_shots[:, :, 4].copy()
+train_opponent_area = train_shots[:, :, 5].copy()
+train_time_proportion = train_shots[:, :, 7].copy()
+indices_to_delete = [0, 3, 4, 5, 6, 7]  
 train_shots = np.delete(train_shots, indices_to_delete, axis=2)
 
-val_player_id = val_shots[:, :, 0].copy()
-val_time_proportion = val_shots[:, :, 1].copy()
-val_hit_area = val_shots[:, :, 4].copy()
-val_player_area = val_shots[:, :, 5].copy()
-val_opponent_area = val_shots[:, :, 6].copy()
-val_shot_type = val_shots[:, :, 7].copy()
-indices_to_delete = [0, 1, 4, 5, 6, 7]  
+val_player_id = val_shots[:, :, 6].copy()
+val_shot_type = val_shots[:, :, 0].copy()
+val_hit_area = val_shots[:, :, 3].copy()
+val_player_area = val_shots[:, :, 4].copy()
+val_opponent_area = val_shots[:, :, 5].copy()
+val_time_proportion = val_shots[:, :, 7].copy()
+indices_to_delete = [0, 3, 4, 5, 6, 7]  
 val_shots = np.delete(val_shots, indices_to_delete, axis=2)
 
-# ✅ Set model hyperparameters
-regularizer = tf.keras.regularizers.l2(0.01)
-loss = 'binary_crossentropy'
-metrics = ['AUC', 'binary_accuracy']
-epochs = 20
-
-MODEL_DIR = "./model/"
-MODEL_NAME = "proposedModal"  
-MODEL_PATH = os.path.join(MODEL_DIR, MODEL_NAME)
-os.makedirs(MODEL_PATH, exist_ok=True)
-
-n_shot_types = len(uniques_type) + 1
-n_area_types = max(train_data['player_location_area'].nunique(), 
-                   train_data['opponent_location_area'].nunique()) + 1  
-n_player_types = train_data['player'].nunique() + 1  
-cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': regularizer, 'activation': 'relu'}
+# Model Hyperparameters
+cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
 transformer_kwargs = {
-    'num_heads': 1,  # Reduce heads to match paper
-    'key_dim': 32,  # Reduce key_dim to 32
-    'ff_dim': 32,  # Reduce FFN dimension to 32
-    'inner_dim': 64  # Add `dinner` as inner FFN dimension
+    'num_heads': 1,  
+    'key_dim':32,  
+    'ff_dim': 32,  
+    'inner_dim': 64  
 }
-dense_kwargs = {'kernel_regularizer': regularizer}
-batch_size = 32
-optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, clipnorm=1.0)  
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, clipnorm=1.0)
 
-import json
-param_dict = {
-    "n_shot_types": n_shot_types, 
-    "n_area_types": n_area_types,  
-    "n_player_types": n_player_types 
-}
+#input data
+train_x = [train_shots, train_shot_type, train_player_id,train_time_proportion,train_hit_area ,train_player_area, train_opponent_area,train_rallies,train_masks]
+val_x = [val_shots, val_shot_type,val_player_id,val_time_proportion,val_hit_area ,val_player_area,val_opponent_area, val_rallies,val_masks]
 
-# Save parameters to a JSON file
-param_path = "./hyperParameter/model_params.json"
-with open(param_path, "w") as f:
-    json.dump(param_dict, f)
-
-print(f"✅ Model parameters saved to {param_path}")
-
-# ✅ Avoid TensorFlow taking up too much GPU memory
-physical_devices = tf.config.experimental.list_physical_devices('GPU')
-try:
-    tf.config.experimental.set_memory_growth(physical_devices[0], True)
-except:
-    pass
-
-# ✅ Build Proposed model
-prediction_model = rc.proposed_model(
-    (seq_len, train_shots.shape[2]),  #train_shots.shape[1] left only 2 features 'backhand', 'aroundhead'
-    embed_types_size=n_shot_types,
-    embed_area_size=n_area_types,
-    embed_player_size=n_player_types,
+# Build the Model
+model = rc.proposed_model(
+    (seq_len, train_shots.shape[2]),
+    embed_types_size=len(type_mapping) + 1,
+    embed_area_size=max(train_data['player_location_area'].nunique(), train_data['opponent_location_area'].nunique(),train_data['hit_area'].nunique()
+                        ,val_data['player_location_area'].nunique(), val_data['opponent_location_area'].nunique(),val_data['hit_area'].nunique()) + 1,  
+    embed_player_size=43,  
     rally_info_shape=len(rally_predictors),
     cnn_kwargs=cnn_kwargs,
     transformer_kwargs=transformer_kwargs,
-    dense_kwargs=dense_kwargs
 )
 
-prediction_model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['AUC', 'binary_accuracy'])
 
-train_x = [train_shots, train_shot_type, train_player_id,train_time_proportion,train_hit_area ,train_player_area, train_opponent_area,train_rallies]
+# Add Callbacks
+model_path = 'best_model.keras'
+if os.path.exists(model_path):
+    os.remove(model_path)  
 
-val_x = [val_shots, val_shot_type,val_player_id,val_time_proportion,val_hit_area ,val_player_area,val_opponent_area, val_rallies]
+callbacks = [
+    EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True),
+    ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True, save_weights_only=False),
+    # shot_encoder_callback
+]
 
-#checkpoint
-checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-    filepath=os.path.join(MODEL_PATH, "weights_epoch_{epoch:02d}.weights.h5"),  
-    save_weights_only=True,
-    save_best_only=False,
-    verbose=1
+# Training Model
+history = model.fit(
+    train_x, train_target,
+    validation_data=(val_x, val_target),
+    epochs=50,
+    batch_size=32,
+    verbose=1,
+    callbacks=callbacks,
+    #shuffle=False
 )
 
-class EpochDebugCallback(Callback):
-    def __init__(self, train_data, train_labels, val_data, val_labels, batch_size=32):
-        super().__init__()
-        self.train_data = train_data
-        self.train_labels = tf.reshape(train_labels, (-1, 1))  # 調整標籤數據形狀
-        self.val_data = val_data
-        self.val_labels = tf.reshape(val_labels, (-1, 1))  # 同樣調整驗證數據形狀
-        self.batch_size = batch_size
 
-    def on_epoch_end(self, epoch, logs=None):
-        print(f"\n🌀 Epoch {epoch + 1} 結束，評估模型...")
-
-        # 使用 GradientTape 手動計算梯度
-        with tf.GradientTape() as tape:
-            predictions = self.model(self.train_data, training=True)
-            loss = self.model.compiled_loss(self.train_labels, predictions)
-
-        # 計算梯度
-        gradients = tape.gradient(loss, self.model.trainable_weights)
-        
-        # 輸出每層的梯度平均值
-        for weight, grad in zip(self.model.trainable_weights, gradients):
-            if grad is not None:
-                tf.print(f'🔍 Layer: {weight.name}, Gradient mean: {tf.reduce_mean(tf.abs(grad))}')
-            else:
-                tf.print(f'⚠️ Layer: {weight.name}, Gradient is None')
-
-        # 訓練集預測值和 loss
-        train_pred = self.model.predict(self.train_data, batch_size=self.batch_size)
-        train_loss = tf.keras.losses.binary_crossentropy(self.train_labels, train_pred)
-        print(f"📊 訓練集預測值範圍: {train_pred.min():.4f} - {train_pred.max():.4f}, 預測均值: {train_pred.mean():.4f}")
-        print(f"🧮 訓練集手動計算的 binary_crossentropy loss: {tf.reduce_mean(train_loss).numpy():.4f}")
-
-        # 驗證集預測值和 loss
-        val_pred = self.model.predict(self.val_data, batch_size=self.batch_size)
-        val_loss = tf.keras.losses.binary_crossentropy(self.val_labels, val_pred)
-        print(f"📊 驗證集預測值範圍: {val_pred.min():.4f} - {val_pred.max():.4f}, 預測均值: {val_pred.mean():.4f}")
-        print(f"🧮 驗證集手動計算的 binary_crossentropy loss: {tf.reduce_mean(val_loss).numpy():.4f}")
-        print(f"📝 Keras 記錄的 Loss: {logs['loss']:.4f}, Val Loss: {logs['val_loss']:.4f}")
-
-
-tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir='./history/', histogram_freq=1)
-# ✅ find all `.weights.h5` file
-checkpoint_files = glob.glob(os.path.join(MODEL_PATH, "weights_epoch_*.weights.h5"))
-latest_checkpoint = None
-if checkpoint_files:
-    latest_checkpoint = max(checkpoint_files, key=lambda x: int(x.split("_epoch_")[-1].split(".")[0]))
-    print(f"🔄 Load new weight: {latest_checkpoint}")
-    prediction_model.load_weights(latest_checkpoint)
-
-    initial_epoch = int(latest_checkpoint.split("_epoch_")[-1].split(".")[0])
-    print(f"🚀 Training start from epoch {initial_epoch + 1} ...")
-else:
-    print("⚠️ No existing model weights found, start from epoch 1.")
-    initial_epoch = 0  
-
-print("🔥🔥🔥 Start training！")
-history = prediction_model.fit(train_x, train_target,
-                               validation_data=(val_x, val_target),
-                               epochs=epochs, 
-                               initial_epoch=initial_epoch,  
-                               batch_size=batch_size,
-                               callbacks=[EpochDebugCallback(train_x,train_target,val_x,val_target)])
-
-# 取得模型對訓練集的預測結果
-y_pred_train = prediction_model.predict(train_x)
-y_pred_val = prediction_model.predict(val_x)
-
-# 查看模型預測值的分佈情況
-import matplotlib.pyplot as plt
-
-plt.hist(y_pred_train.flatten(), bins=50)
-plt.xlabel("預測值 (Predicted Probability)")
-plt.ylabel("頻率 (Frequency)")
-plt.title("模型初始預測值分佈")
+# Plotting Training and Validation Loss
+plt.figure(figsize=(8, 6))
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.title('Training and Validation Loss Over Epochs')
 plt.show()
 
-# 如果預測值大部分集中在 0 或 1，會看到分佈圖兩端有很高的頻率
 
-# 建立 DataFrame，存儲預測與實際值
-rally_predictions_train = pd.DataFrame({
-    "rally_id": train_rally_id,      # 訓練集的 `rally_id`
-    "predicted_win_prob": y_pred_train.flatten(),  # 預測的 `win probability`
-    "actual_win": train_target.flatten()      # 真實的 `is_target_win`
-})
 
-# 存成 CSV
-rally_predictions_train.to_csv("train_rally_predictions.csv", index=False)
-print("✅ 訓練期間預測與真實勝率對比結果已存成 CSV：train_rally_predictions.csv")
+# import tensorflow as tf
+# from tensorflow.keras.callbacks import Callback
+# import numpy as np
+# import csv
 
-# set `model_file`
-model_file = os.path.join("./model/", MODEL_NAME, timestr, "final_model.weights.h5") 
+# class ShotEncoderOutputCallback(Callback):
+#     def __init__(self, train_data, output_file='train_shot_encoder_output.csv', batch_limit=5):
+#         super().__init__()
+#         self.train_data = train_data
+#         self.output_file = output_file
+#         self.batch_limit = batch_limit  # 只保存前幾個 batch 以免文件過大
 
-# ✅ Make sure the archive directory exists
-model_dir = os.path.dirname(model_file)
-os.makedirs(model_dir, exist_ok=True)
+#     def on_batch_end(self, batch, logs=None):
+#         if batch >= self.batch_limit:
+#             return
+        
+#         # 獲取中間層輸出（Shot Encoder Output）
+#         Shots_input = self.model.get_layer("Tile_mask_for_heads").output
+#         intermediate_model = tf.keras.Model(inputs=self.model.input, outputs=Shots_input)
+        
+#         encoder_output_data = intermediate_model.predict(self.train_data)
 
-# ✅ Storing model weights
-prediction_model.save_weights(model_file)
-print(f"✅ Model weights are stored in: {model_file}")
+#         # 將輸出寫入 CSV 文件
+#         with open(self.output_file, mode='a', newline='') as file:  # 使用 'a' 追加模式
+#             writer = csv.writer(file)
+#             for row in encoder_output_data:
+#                 # 將 row 轉成列表，保證是可迭代的
+#                 if isinstance(row, (float, int, np.float32, np.int32)):
+#                     writer.writerow([row])  # 包裝成列表
+#                 else:
+#                     writer.writerow(row)
+        
+#         print(f"Saved shot encoder output to {self.output_file} for batch {batch + 1}")
 
+
+# shot_encoder_callback = ShotEncoderOutputCallback(
+#     train_data=[
+#         train_x
+#     ],
+#     output_file='+Tile_mask_for_heads.csv',
+#     batch_limit=5  # 只保存前 5 個 batch
+# )
+
+# import pandas as pd
+# # 假設 train_shots 形狀是 (batch_size, seq_len, 8)
+# batch_size, seq_len, feature_dim = train_shots.shape
+# flat_shots = train_shots.reshape(-1, feature_dim)
+# df_shots = pd.DataFrame(flat_shots)
+# # 將 DataFrame 保存為 CSV 文件，每一行表示 8 個特徵
+# df_shots.to_csv("train_shots.csv", index=False,header=False)
+# print("train_shots 已成功保存到 train_shots.csv")

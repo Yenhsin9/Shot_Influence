@@ -5,11 +5,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pylab as plt
-
-
-VAL_ID = [30, 31, 32, 33, 34, 35, 36, 37, 38]  
-TEST_ID = [39, 40, 50, 52, 53, 54, 55, 56, 57]
-
+from sklearn.model_selection import train_test_split
 
 class PreDataProcessor:
     def __init__(self, path: str):
@@ -17,8 +13,10 @@ class PreDataProcessor:
         # convert players to categorical values (anonymize)
         self.show_unique_players()
         #1/0
-        self.match['winner'] = self.match['winner'].apply(lambda x: self.unique_players.index(x))
-        self.match['loser'] = self.match['loser'].apply(lambda x: self.unique_players.index(x))
+        self.match['winner'] = self.match['winner'].apply(lambda x: self.unique_players.index(x)+1)
+        self.match['loser'] = self.match['loser'].apply(lambda x: self.unique_players.index(x)+1)
+        print("Unique Winner IDs:", self.match['winner'].unique())
+        print("Unique Loser IDs:", self.match['loser'].unique())
 
         self.homography = pd.read_csv(f"{path}homography.csv")
         #self.homography = self.homography.drop(columns=['video', 'db'])
@@ -46,7 +44,7 @@ class PreDataProcessor:
             match_path = os.path.join(directory, match_name)
             csv_paths = [os.path.join(match_path, f) for f in os.listdir(match_path) if f.endswith('.csv')]
             
-            one_match = []
+            one_match_set = []
             for csv_path in csv_paths:
                 data = pd.read_csv(csv_path)
                 set_id = int(re.findall(r'\d+', os.path.basename(csv_path))[0])  
@@ -60,11 +58,20 @@ class PreDataProcessor:
                     rally['is_target_win'] = 1 if getpoint_player=='A' else 0
                     rally['set'] = set_id
                     rally['match_id'] = match_idx
+                    rally['winner'] = winner
+                    rally['loser'] = loser
 
-                    one_match.append(rally)
+                    one_match_set.append(rally)
 
-            match = pd.concat(one_match, ignore_index=True, sort=False).assign(match_id=match_idx)
+            match = pd.concat(one_match_set, ignore_index=True, sort=False).assign(match_id=match_idx)
 
+            
+            match['landing_x'] = match['landing_x'].astype(float)
+            match['landing_y'] = match['landing_y'].astype(float)
+            match['player_location_x'] = match['player_location_x'].astype(float)
+            match['player_location_y'] = match['player_location_y'].astype(float)
+            match['opponent_location_x'] = match['opponent_location_x'].astype(float)
+            match['opponent_location_y'] = match['opponent_location_y'].astype(float)
             # project screen coordinate to real coordinate
             for i in range(len(match)):
                 # project ball coordinates
@@ -113,12 +120,14 @@ class PreDataProcessor:
         # Drop hit_area at outside
         outside_area = [10, 11, 12, 13, 14, 15, 16]
         matches.loc[matches['server'] == 1, 'hit_area'] = 7
-        for area in outside_area:
-            outside_rallies = matches.loc[matches['hit_area'] == area, 'rally_id']
-            matches = matches[~matches['rally_id'].isin(outside_rallies)]
-            matches = matches.reset_index(drop=True)
+        # for area in outside_area:
+        #     outside_rallies = matches.loc[matches['hit_area'] == area, 'rally_id']
+        #     matches = matches[~matches['rally_id'].isin(outside_rallies)]
+        #     matches = matches.reset_index(drop=True)
         # Deal with hit_area convert hit_area to integer
         matches = self.drop_na_rally(matches, columns=['hit_area'])
+        for area in outside_area:
+            matches.loc[matches['hit_area'] == area, 'hit_area'] = 10
         matches['hit_area'] = matches['hit_area'].astype(float).astype(int)
         print("After converting hit_area: ")
         self.print_current_size(matches)
@@ -209,7 +218,7 @@ class PreDataProcessor:
             player_matrix[player_index_col][player_index_row] += 1
         player_matrix = pd.DataFrame(player_matrix, index=self.unique_players, columns=self.unique_players)
         
-        plot = sns.heatmap(player_matrix, annot=True, linewidths=0.5, cbar=False)
+        plot = sns.heatmap(player_matrix, annot=True, linewidths=0.3, cbar=False)
         plt.xticks(rotation=30, ha='right')
         plot.get_figure().savefig("./figures/player_matrix.png", dpi=300, bbox_inches='tight')
         plot.clear()
@@ -234,40 +243,46 @@ class CoachAITrainTestSplit:
         self.matches = pd.read_csv(f"{path}match_metadata.csv")
         self.given_strokes_num = 4
 
-        match_train, match_val, match_test = [], [], []
-        for match_id in self.metadata['match_id'].unique():
-            if match_id in VAL_ID:
-                match_val.append(self.metadata[self.metadata['match_id']==match_id])
-            elif match_id in TEST_ID:
-                match_test.append(self.metadata[self.metadata['match_id']==match_id])
-            else:
-                match_train.append(self.metadata[self.metadata['match_id']==match_id])
+        # Create only match_set_id 
+        self.metadata['match_sets_id'] = self.metadata['match_id'].astype(str) + "_" + self.metadata['set'].astype(str)
+        unique_match_sets = self.metadata['match_sets_id'].unique()
+        print(f"Total unique match sets: {len(unique_match_sets)}")
 
-        match_train = pd.concat(match_train, ignore_index=True, sort=False)
-        match_val = pd.concat(match_val, ignore_index=True, sort=False)
-        match_test = pd.concat(match_test, ignore_index=True, sort=False)
-        print("train val test")
-        print(match_train['rally_id'].nunique(), match_val['rally_id'].nunique(), match_test['rally_id'].nunique())
+        train_match_sets, val_match_sets = train_test_split(unique_match_sets, test_size=0.3, random_state=42)
+        test_match_sets, val_match_sets = train_test_split(val_match_sets, test_size=0.5, random_state=42)
+
+        # Make sure there is no overlap between datasets
+        assert len(set(train_match_sets) & set(val_match_sets)) == 0, "Train and Validation sets overlap!"
+        assert len(set(train_match_sets) & set(test_match_sets)) == 0, "Train and Test sets overlap!"
+        assert len(set(val_match_sets) & set(test_match_sets)) == 0, "Validation and Test sets overlap!"
+
+        # Use Boolean mask to segment data and avoid data duplication
+        match_train = self.metadata[self.metadata['match_sets_id'].isin(train_match_sets)].copy()
+        match_val = self.metadata[self.metadata['match_sets_id'].isin(val_match_sets)].copy()
+        match_test = self.metadata[self.metadata['match_sets_id'].isin(test_match_sets)].copy()
+        
+        print("Data distribution:")
+        print(f"Train Sets: {match_train['match_sets_id'].nunique()} sets, {match_train['rally_id'].nunique()} rallies")
+        print(f"Validation Sets: {match_val['match_sets_id'].nunique()} sets, {match_val['rally_id'].nunique()} rallies")
+        print(f"Test Sets: {match_test['match_sets_id'].nunique()} sets, {match_test['rally_id'].nunique()} rallies")
 
         match_train = self.preprocess_files(match_train)
         match_test = self.preprocess_files(match_test)
         match_val = self.preprocess_files(match_val)
 
-        print("========== Val not in Train=========")
+        print("========== Player in Val but not in Train=========")
         for player in match_val['player'].unique():
             if player not in match_train['player'].unique():
                 print(player, sep=', ')
-        print("========== Test not in Train=========")
+        print("========== Player in Test but not in Train=========")
         for player in match_test['player'].unique():
             if player not in match_train['player'].unique():
                 print(player, sep=', ')
 
         # output to csv
         match_train.to_csv(f"{path}train.csv", index=False)
-        match_test[match_test['ball_round'].isin([_ for _ in range(self.given_strokes_num+1)])].to_csv(f"{path}test_given.csv", index=False)
-        match_val[match_val['ball_round'].isin([_ for _ in range(self.given_strokes_num+1)])].to_csv(f"{path}val_given.csv", index=False)
-        match_test[~match_test['ball_round'].isin([_ for _ in range(self.given_strokes_num+1)])][['rally_id', 'ball_round', 'type', 'landing_x', 'landing_y']].to_csv(f"{path}test_gt.csv", index=False)
-        match_val[~match_val['ball_round'].isin([_ for _ in range(self.given_strokes_num+1)])][['rally_id', 'ball_round', 'type', 'landing_x', 'landing_y']].to_csv(f"{path}val_gt.csv", index=False)
+        match_val.to_csv(f"{path}val.csv", index=False)
+        match_test.to_csv(f"{path}test.csv", index=False)
 
     def preprocess_files(self, match):
         def flatten(t):

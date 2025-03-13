@@ -50,28 +50,26 @@ def prepare_data(dataset: pd.DataFrame,
 
         getpoint_player = rally['getpoint_player'].iloc[-1]
         # ====== (Score Difference) ======
-        setid = rally['set'].iloc[-1]
+        match_setid = rally['match_sets_id'].iloc[-1]
         score_A = rally['roundscore_A'].iloc[-1]
         score_B = rally['roundscore_B'].iloc[-1]
-
-        if setid != pre_setid:
-            prev_score_A = 0
-            prev_score_B = 0
+        winnerA = rally['winner'].iloc[-1]
+        loserB = rally['loser'].iloc[-1]
+        
+        if match_setid != pre_setid:
             score_diff = 0
         else:
-            if score_A > prev_score_A and score_B == prev_score_B: 
+            if getpoint_player == winnerA: 
                 score_diff = score_A - score_B
-            elif score_B > prev_score_B and score_A == prev_score_A:  
+            elif getpoint_player == loserB:  
                 score_diff = score_B - score_A
             else:
                 score_diff = 0  
 
-        prev_score_A = score_A
-        prev_score_B = score_B
         rally['roundscore_diff'] = score_diff
             
          # (Consecutive Points)
-        if setid != pre_setid: 
+        if match_setid != pre_setid: 
             last_getpoint_player = None
             consecutive_points = 1
         else:
@@ -82,7 +80,7 @@ def prepare_data(dataset: pd.DataFrame,
 
         last_getpoint_player = getpoint_player
         rally['consecutive_points'] = consecutive_points
-        pre_setid = setid
+        pre_setid = match_setid
 
         if 'time_proportion' not in shot_attributes_f:
             shot_attributes_f.append('time_proportion')
