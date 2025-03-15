@@ -20,11 +20,11 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
     # ✅ Input Layers
     input_shots = tf.keras.Input(shape=shot_sequence_shape, name='Shots_input')  # (None, seq_len, 2)
     input_shot_types = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Shot_types_input')
+    input_player_id = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Player_input')
     input_time_proportion = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Time_proportion_input')
     input_hit_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Hit_area_input')
     input_player_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Player_area_input')
     input_opponent_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Opponent_area_input')
-    input_player_id = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Player_input')
     input_rally = tf.keras.Input(shape=(rally_info_shape,), name='Rally_input')
     input_masks = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Mask_input')
 
@@ -80,6 +80,24 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
     return [input_shots,input_shot_types,input_player_id,input_time_proportion, input_hit_area, input_player_area, input_opponent_area, 
               input_rally,input_masks], shot_encoder_output
 
+def sinusoidal_position_encoding(seq_len, hidden_dim):
+    """
+    Transformer 論文 (Attention Is All You Need) 的 Sinusoidal Position Encoding
+    :param seq_len: 序列長度
+    :param hidden_dim: 特徵維度 (與 pattern_sequence 的 embedding_dim 相同)
+    :return: (1, seq_len, hidden_dim) 的 Position Encoding
+    """
+    position = np.arange(seq_len)[:, np.newaxis]  # shape: (seq_len, 1)
+    div_term = np.exp(np.arange(0, hidden_dim, 2) * -(np.log(10000.0) / hidden_dim))
+
+    pos_encoding = np.zeros((seq_len, hidden_dim))
+    pos_encoding[:, 0::2] = np.sin(position * div_term)  # 偶數維度 sin
+    pos_encoding[:, 1::2] = np.cos(position * div_term)  # 奇數維度 cos
+
+    pos_encoding = tf.convert_to_tensor(pos_encoding, dtype=tf.float32)  # 轉換為 Tensor
+    pos_encoding = tf.expand_dims(pos_encoding, axis=0)  # (1, seq_len, hidden_dim)
+
+    return pos_encoding
 
 # Proposed modal: CNN + Position + Mutihead Attention
 def proposed_model(shot_sequence_shape: Tuple[int, int], 
@@ -100,12 +118,12 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     # ✅ CNN Feature Extraction with Masking
     layer_cnn = StaggeredConv1D(name='Local_pattern_extraction', **cnn_kwargs)
     pattern_sequence = layer_cnn(shot_encoder_output, mask=inputs[-1])
-    pattern_sequence = tf.keras.layers.Dropout(0.5)(pattern_sequence) 
+    pattern_sequence = tf.keras.layers.Dropout(0.3)(pattern_sequence) 
 
     # ✅ Positional Encoding
     seq_len = shot_sequence_shape[0]
-    pos_encoding = Embedding(input_dim=seq_len, output_dim=pattern_sequence.shape[-1])(tf.range(seq_len))
-    pattern_sequence_with_pos = pattern_sequence + pos_encoding
+    pos_encoding = sinusoidal_position_encoding(seq_len, pattern_sequence.shape[-1])
+    pattern_sequence_with_pos = pattern_sequence + pos_encoding  # 加入位置編碼
 
     # ✅ Transformer Encoder
     num_heads = transformer_kwargs['num_heads']
@@ -130,7 +148,7 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     )(mask)
 
     mha = MultiHeadAttention(num_heads=num_heads, key_dim=transformer_kwargs['key_dim'],
-                            kernel_regularizer=l2(0.01),dropout=0.3)
+                            kernel_regularizer=l2(0.01))#,dropout=0.5
     attn_output, attn_weights = mha(
         pattern_sequence_with_pos, 
         pattern_sequence_with_pos, 
