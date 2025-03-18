@@ -134,7 +134,16 @@ plt.legend()
 plt.title('Training and Validation Loss Over Epochs')
 plt.show()
 
-
+# 取得預測結果並儲存
+train_predictions = model.predict(train_x)
+predictions_df = pd.DataFrame({
+    'rally_id': train_rally_id,
+    'true_label': train_target,
+    'predicted_win_probability': train_predictions.flatten()
+})
+predictions_csv = 'predictions2.csv'
+predictions_df.to_csv(predictions_csv, index=False)
+print(f"✅ 已儲存預測結果至 {predictions_csv}")
 
 # import tensorflow as tf
 # from tensorflow.keras.callbacks import Callback
