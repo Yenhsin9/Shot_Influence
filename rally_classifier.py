@@ -147,7 +147,7 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     )(mask)
 
     mha = MultiHeadAttention(num_heads=num_heads, key_dim=transformer_kwargs['key_dim'],
-                            kernel_regularizer=l2(0.01))#,dropout=0.3
+                            kernel_regularizer=l2(0.01),dropout=0.5)
     attn_output, attn_weights = mha(
         pattern_sequence_with_pos, 
         pattern_sequence_with_pos, 

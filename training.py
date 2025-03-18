@@ -81,7 +81,7 @@ transformer_kwargs = {
     'ff_dim': 32,  
     'inner_dim': 64  
 }
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, clipnorm=1.0)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001, clipnorm=1.0)
 
 #input data
 train_x = [train_shots, train_shot_type, train_player_id,train_time_proportion,train_hit_area ,train_player_area, train_opponent_area,train_rallies,train_masks]

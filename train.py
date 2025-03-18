@@ -40,7 +40,6 @@ def prepare_data(dataset: pd.DataFrame,
 
     pre_setid = None
     consecutive_points = 0
-    last_getpoint_player = None
     for rally_id, rally in dataset.groupby('rally_id'):
         if min_len > 0 and len(rally) < min_len:
             continue
@@ -55,30 +54,21 @@ def prepare_data(dataset: pd.DataFrame,
         score_B = rally['roundscore_B'].iloc[-1]
         winnerA = rally['winner'].iloc[-1]
         loserB = rally['loser'].iloc[-1]
-        
-        if match_setid != pre_setid:
-            score_diff = 0
-        else:
-            if getpoint_player == winnerA: 
-                score_diff = score_A - score_B
-            elif getpoint_player == loserB:  
-                score_diff = score_B - score_A
-            else:
-                score_diff = 0  
 
-        rally['roundscore_diff'] = score_diff
+        rally['roundscore_diff'] = score_A-score_B
             
          # (Consecutive Points)
-        if match_setid != pre_setid: 
-            last_getpoint_player = None
-            consecutive_points = 1
+        if (match_setid != pre_setid):
+            if getpoint_player == winnerA:
+                consecutive_points = 1
+            else:
+                consecutive_points = 0
         else:
-            if getpoint_player == last_getpoint_player:
+            if getpoint_player == winnerA:
                 consecutive_points += 1
             else:
-                consecutive_points = 1 
+                consecutive_points = 0
 
-        last_getpoint_player = getpoint_player
         rally['consecutive_points'] = consecutive_points
         pre_setid = match_setid
 
