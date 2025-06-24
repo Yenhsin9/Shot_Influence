@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint,Callback
 import os
 import csv
+from tensorflow.keras.models import load_model
 
 # Load Data
 train_data = pd.read_csv('./data/train.csv')
@@ -74,14 +75,14 @@ indices_to_delete = [0, 3, 4, 5, 6, 7]
 val_shots = np.delete(val_shots, indices_to_delete, axis=2)
 
 # Model Hyperparameters
-cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
+cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
 transformer_kwargs = {
     'num_heads': 1,  
-    'key_dim':32,  
-    'ff_dim': 32,  
-    'inner_dim': 64  
+    'key_dim':16,  
+    'ff_dim': 16,  
+    'inner_dim': 32  
 }
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, clipnorm=1.0)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005, clipnorm=1.0)
 
 #input data
 train_x = [train_shots, train_shot_type, train_player_id,train_time_proportion,train_hit_area ,train_player_area, train_opponent_area,train_rallies,train_masks]
@@ -99,7 +100,10 @@ model = rc.proposed_model(
     transformer_kwargs=transformer_kwargs,
 )
 
-model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['AUC', 'binary_accuracy'])
+model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=[
+        tf.keras.metrics.AUC(name='auc'),
+        tf.keras.metrics.MeanSquaredError(name='brier_score')
+    ])
 
 # Add Callbacks
 model_path = 'best_model.keras'
@@ -107,9 +111,8 @@ if os.path.exists(model_path):
     os.remove(model_path)  
 
 callbacks = [
-    EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True),
+    EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
     ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True, save_weights_only=False),
-    # shot_encoder_callback
 ]
 
 # Training Model
@@ -123,7 +126,6 @@ history = model.fit(
     shuffle=True
 )
 
-
 # Plotting Training and Validation Loss
 plt.figure(figsize=(8, 6))
 plt.plot(history.history['loss'], label='Training Loss')
@@ -134,8 +136,10 @@ plt.legend()
 plt.title('Training and Validation Loss Over Epochs')
 
 # 獲取 AUC 數據
-train_auc = history.history['AUC']  # 訓練集 AUC
-val_auc = history.history['val_AUC']  # 驗證集 AUC
+train_auc = history.history['auc']  # 訓練集 AUC
+val_auc = history.history['val_auc']  # 驗證集 AUC
+train_br = history.history['brier_score']
+val_br = history.history['val_brier_score']
 
 epochs = range(1, len(train_auc) + 1)  # Epoch 數
 
@@ -153,6 +157,15 @@ plt.grid()
 
 plt.show()
 
+plt.figure()
+plt.plot(epochs, train_br, label='Train Brier Score')
+plt.plot(epochs, val_br,   label='Validation Brier Score')
+plt.xlabel('Epoch')
+plt.ylabel('Brier Score')
+plt.title('Brier Score over Epochs')
+plt.legend()
+plt.grid(True)
+plt.show()
 # import tensorflow as tf
 # from tensorflow.keras.callbacks import Callback
 # import numpy as np

@@ -41,6 +41,7 @@ def prepare_data(dataset: pd.DataFrame,
     pre_setid = None
     consecutive_points = 0
     last_getpoint_player = None
+    pre_diff = 0
     for rally_id, rally in dataset.groupby('rally_id'):
         if min_len > 0 and len(rally) < min_len:
             continue
@@ -48,41 +49,29 @@ def prepare_data(dataset: pd.DataFrame,
         # ====== (Time Proportion) ======
         rally['time_proportion'] = np.linspace(0, 1, len(rally))
 
-        getpoint_player = rally['getpoint_player'].iloc[-1]
+        tmp_getpoint_player = rally['getpoint_player'].iloc[-1]
         # ====== (Score Difference) ======
         setid = rally['set'].iloc[-1]
         score_A = rally['roundscore_A'].iloc[-1]
         score_B = rally['roundscore_B'].iloc[-1]
-
-        if setid != pre_setid:
-            prev_score_A = 0
-            prev_score_B = 0
-            score_diff = 0
-        else:
-            if score_A > prev_score_A and score_B == prev_score_B: 
-                score_diff = score_A - score_B
-            elif score_B > prev_score_B and score_A == prev_score_A:  
-                score_diff = score_B - score_A
-            else:
-                score_diff = 0  
-
-        prev_score_A = score_A
-        prev_score_B = score_B
-        rally['roundscore_diff'] = score_diff
+        tmpdiff = score_A-score_B
             
          # (Consecutive Points)
         if setid != pre_setid: 
-            last_getpoint_player = None
-            consecutive_points = 1
+            roundscore_diff = 0
+            consecutive_points = 0
         else:
-            if getpoint_player == last_getpoint_player:
+            roundscore_diff = pre_diff
+            if last_getpoint_player == 'A':
                 consecutive_points += 1
             else:
-                consecutive_points = 1 
+                consecutive_points = 0  
 
-        last_getpoint_player = getpoint_player
-        rally['consecutive_points'] = consecutive_points
+        pre_diff = tmpdiff
+        last_getpoint_player = tmp_getpoint_player
         pre_setid = setid
+        rally['consecutive_points'] = consecutive_points
+        rally['roundscore_diff'] = roundscore_diff
 
         if 'time_proportion' not in shot_attributes_f:
             shot_attributes_f.append('time_proportion')

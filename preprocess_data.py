@@ -7,9 +7,8 @@ import seaborn as sns
 import matplotlib.pylab as plt
 
 
-VAL_ID = [30, 31, 32, 33, 34, 35, 36, 37, 38]  
-TEST_ID = [39, 40, 50, 52, 53, 54, 55, 56, 57]
-
+VAL_ID = [27,28,29,30,31,32,33,34,35]  
+TEST_ID = [36,37,38,39,40,41,42,43,44]  
 
 class PreDataProcessor:
     def __init__(self, path: str):
@@ -60,6 +59,8 @@ class PreDataProcessor:
                     rally['is_target_win'] = 1 if getpoint_player=='A' else 0
                     rally['set'] = set_id
                     rally['match_id'] = match_idx
+                    rally['winner'] = winner
+                    rally['loser'] = loser
 
                     one_match.append(rally)
 
