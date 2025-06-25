@@ -57,7 +57,7 @@ transformer_kwargs = {
 }
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005, clipnorm=1.0)
 MODEL_NAME = 'proposedModal'
-MODEL_PATH = "best_model_fold_1.keras"
+MODEL_PATH = "best_model_fold_3.keras"
 
 #input data
 test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_hit_area ,test_player_area, test_opponent_area,test_rallies,test_masks]

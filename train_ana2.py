@@ -48,7 +48,7 @@ for fold in range(1, num_folds + 1):
     }
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005, clipnorm=1.0)
     print(f"\nTraining Fold {fold}...")
-    epochs = 50
+    epochs = 200
     # Load fold data
     train_data = pd.read_csv(f'./data/train_fold_{fold}.csv')
     val_data = pd.read_csv(f'./data/val_fold_{fold}.csv')

@@ -145,8 +145,22 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     ffn_output = Dense(transformer_kwargs['ff_dim'])(ffn)  
     transformer_output = LayerNormalization(epsilon=1e-6)(ffn_output + attn_output)
 
+    # 擴展 mask 維度以對應 transformer_output
+    expanded_mask = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=2),
+            output_shape=lambda s: (s[0], s[1], 1))(inputs[-1])
+
+    # 將 padding 區設為 -inf，有效區保留原值
+    masked_output = tf.keras.layers.Lambda(
+        lambda args: tf.where(
+            tf.equal(args[0], 1),
+            args[1],
+            tf.fill(tf.shape(args[1]), tf.float32.min)
+        ),
+        output_shape=lambda s: s[1]
+    )([expanded_mask, transformer_output])
+
     # ✅ Max Pooling
-    rally_representation = tf.keras.layers.GlobalMaxPooling1D()(transformer_output)
+    rally_representation = tf.keras.layers.GlobalMaxPooling1D()(masked_output)
 
     # ✅ Concatenate with Rally Information
     layer_concat_rally = tf.keras.layers.Concatenate(name='Seq_rally_merging')([rally_representation, inputs[-2]])

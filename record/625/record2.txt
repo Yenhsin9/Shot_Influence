@@ -1,0 +1,12 @@
+Fold 5 - Final Val Loss: 0.8440, Val AUC: 0.5098, Val Brier Score: 0.2804
+最佳模型來自 Fold 3，驗證 AUC: 0.5767
+
+Average Validation Metrics Across Folds:
+Average Val Loss: 0.8357
+Average Val AUC: 0.5419
+Average Val Brier Score: 0.2743
+--------------------------------------
+✅ Model weights loaded successfully: best_model_fold_3.keras
+2025-06-25 21:51:46.580903: I tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.cc:117] Plugin optimizer for device_type GPU is enabled.
+11/11 ━━━━━━━━━━━━━━━━━━━━ 1s 42ms/step - auc: 0.5869 - brier_score: 0.2684 - loss: 0.8189 
+Test Loss: 0.8106 | AUC: 0.5842 | Brier: 0.2639
