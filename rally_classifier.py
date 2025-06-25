@@ -16,6 +16,8 @@ from tensorflow.keras.regularizers import l2
 import csv
 def preprocess_inputs(shot_sequence_shape, rally_info_shape,
                       embed_types_size=None, embed_area_size=None, embed_player_size=None):
+    
+    max_len = shot_sequence_shape[0]
     """Preprocess input encoding: Input + Embedding + Concatenation + Masking"""
     # ✅ Input Layers
     input_shots = tf.keras.Input(shape=shot_sequence_shape, name='Shots_input')  # (None, seq_len, 2)
@@ -53,13 +55,13 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
         theta_n = Dense(15, activation='linear', 
                         kernel_initializer=tf.keras.initializers.RandomUniform(minval=-1, maxval=1), 
                         name='Theta_latent')(embedded_shot_types)
-
         # ✅ Time Proportion Enhancement
-        tiled_time_proportion = tf.keras.layers.Lambda(
-            lambda x: tf.expand_dims(x, axis=-1), 
-            output_shape=(62, 1)
-        )(input_time_proportion)
-        tiled_time_proportion = tf.keras.layers.Lambda(lambda x: tf.tile(x, [1, 1, 15]))(tiled_time_proportion)
+        tiled_time_proportion = tf.keras.layers.Reshape(
+            (max_len, 1)
+        )(input_time_proportion)  # Shape: (None, max_len, 1)
+        tiled_time_proportion = tf.keras.layers.Concatenate(axis=-1)(
+            [tiled_time_proportion] * 15
+        )  # Shape: (None, max_len, 15)
 
         # μn * τn
         time_mu_proportion = tf.keras.layers.Multiply(name='Time_proportion_multiply')([mu_n, tiled_time_proportion])

@@ -1,7 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.initializers import HeNormal
 import matplotlib.pyplot as plt
-import numpy as np
 from tensorflow.keras.callbacks import Callback
 import csv
 class StaggeredConv1D(tf.keras.layers.Layer):

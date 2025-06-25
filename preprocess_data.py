@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pylab as plt
-
+from sklearn.model_selection import train_test_split, KFold
 
 VAL_ID = [27,28,29,30,31,32,33,34,35]  
 TEST_ID = [36,37,38,39,40,41,42,43,44]  
@@ -231,62 +231,71 @@ class PreDataProcessor:
 
 class CoachAITrainTestSplit:
     def __init__(self, path):
-        self.metadata = pd.read_csv(f"{path}shot_metadata.csv")
-        self.matches = pd.read_csv(f"{path}match_metadata.csv")
+        self.metadata = pd.read_csv(os.path.join(path, 'shot_metadata.csv'))
+        self.matches = pd.read_csv(os.path.join(path, 'match_metadata.csv'))
         self.given_strokes_num = 4
+        self.path = path
 
-        match_train, match_val, match_test = [], [], []
-        for match_id in self.metadata['match_id'].unique():
-            if match_id in VAL_ID:
-                match_val.append(self.metadata[self.metadata['match_id']==match_id])
-            elif match_id in TEST_ID:
-                match_test.append(self.metadata[self.metadata['match_id']==match_id])
-            else:
-                match_train.append(self.metadata[self.metadata['match_id']==match_id])
+        # 獲取所有唯一比賽 ID
+        match_ids = self.metadata['match_id'].unique()
 
-        match_train = pd.concat(match_train, ignore_index=True, sort=False)
-        match_val = pd.concat(match_val, ignore_index=True, sort=False)
-        match_test = pd.concat(match_test, ignore_index=True, sort=False)
-        print("train val test")
-        print(match_train['rally_id'].nunique(), match_val['rally_id'].nunique(), match_test['rally_id'].nunique())
+        # 分割為訓練+驗證集（80%）和測試集（20%）
+        train_val_ids, test_ids = train_test_split(match_ids, test_size=0.2, random_state=42)
 
-        match_train = self.preprocess_files(match_train)
-        match_test = self.preprocess_files(match_test)
-        match_val = self.preprocess_files(match_val)
+        # 儲存測試集
+        self.match_test = self.metadata[self.metadata['match_id'].isin(test_ids)]
+        self.match_test.to_csv(os.path.join(path, 'test.csv'), index=False)
 
-        print("========== Val not in Train=========")
-        for player in match_val['player'].unique():
-            if player not in match_train['player'].unique():
-                print(player, sep=', ')
-        print("========== Test not in Train=========")
-        for player in match_test['player'].unique():
-            if player not in match_train['player'].unique():
-                print(player, sep=', ')
+        # 在訓練+驗證集上進行 5 折交叉驗證
+        kf = KFold(n_splits=5, shuffle=True, random_state=42)
+        fold = 1
+        for train_idx, val_idx in kf.split(train_val_ids):
+            train_fold_ids = train_val_ids[train_idx]
+            val_fold_ids = train_val_ids[val_idx]
 
-        # output to csv
-        match_train.to_csv(f"{path}train.csv", index=False)
-        match_val.to_csv(f"{path}val.csv", index=False)
-        match_test.to_csv(f"{path}test.csv", index=False)
+            # 生成訓練集和驗證集
+            match_train = self.metadata[self.metadata['match_id'].isin(train_fold_ids)]
+            match_val = self.metadata[self.metadata['match_id'].isin(val_fold_ids)]
 
-    def preprocess_files(self, match):
-        def flatten(t):
-            return [item for sublist in t for item in sublist]
+            # 儲存每個折的訓練集和驗證集
+            match_train.to_csv(os.path.join(path, f'train_fold_{fold}.csv'), index=False)
+            match_val.to_csv(os.path.join(path, f'val_fold_{fold}.csv'), index=False)
+            fold += 1
 
-        unused_columns = ['server']
-        # , 'player_location_area', 'player_location_x', 'player_location_y', 'opponent_location_area', 'opponent_location_x', 'opponent_location_y'
+        # 檢查驗證集和測試集中的玩家是否出現在訓練集中
+        for fold in range(1, 6):
+            train_data = pd.read_csv(os.path.join(path, f'train_fold_{fold}.csv'))
+            val_data = pd.read_csv(os.path.join(path, f'val_fold_{fold}.csv'))
+            train_players = set(train_data['player'].unique())
+            val_players = set(val_data['player'].unique())
+            print(f'========== Fold {fold} Val not in Train =========')
+            print(val_players - train_players)
+        test_players = set(self.match_test['player'].unique())
+        print('========== Test not in Train =========')
+        print(test_players - train_players)
 
-        # compute rally length
-        rally_len = []
-        for rally_id in match['rally_id'].unique():
-            rally_info = match.loc[match['rally_id'] == rally_id]
-            rally_len.append([len(rally_info)]*len(rally_info))
-        rally_len = flatten(rally_len)
-        match['rally_length'] = rally_len
+        # 後續預處理
+        self.preprocess_files()
 
-        # filter rallies that are less than \tau + 1
-        match = match[match['rally_length'] >= self.given_strokes_num+1].reset_index(drop=True)
+    def preprocess_files(self):
+        for fold in range(1, 6):
+            train_data = pd.read_csv(os.path.join(self.path, f'train_fold_{fold}.csv'))
+            val_data = pd.read_csv(os.path.join(self.path, f'val_fold_{fold}.csv'))
+            test_data = pd.read_csv(os.path.join(self.path, 'test.csv'))
 
-        return match.drop(columns=unused_columns)
+            for data, name in [(train_data, f'train_fold_{fold}'), (val_data, f'val_fold_{fold}'), (test_data, 'test')]:
+                data['rally_length'] = data.groupby(['match_id', 'rally_id'])['rally_id'].transform('count')
+                data = data[data['rally_length'] >= self.given_strokes_num + 1]
+                data = data.drop(['server'], axis=1, errors='ignore')
+                data.to_csv(os.path.join(self.path, f'{name}.csv'), index=False)
+
+        # 打印每個集合的唯一比賽數量
+        for fold in range(1, 6):
+            train_data = pd.read_csv(os.path.join(self.path, f'train_fold_{fold}.csv'))
+            val_data = pd.read_csv(os.path.join(self.path, f'val_fold_{fold}.csv'))
+            print(f'Fold {fold} - Train rallies: {train_data["rally_id"].nunique()}, Val rallies: {val_data["rally_id"].nunique()}')
+        test_data = pd.read_csv(os.path.join(self.path, 'test.csv'))
+        print(f'Test rallies: {test_data["rally_id"].nunique()}')
 
 
 if __name__ == "__main__":

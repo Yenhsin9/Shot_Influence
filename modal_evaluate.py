@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint,Callback
 import os
 import csv
-from sklearn.metrics import brier_score_losssd
 
 # Load Data
 test_data = pd.read_csv('./data/test.csv')
@@ -48,17 +47,17 @@ indices_to_delete = [0, 3, 4, 5, 6, 7]
 test_shots = np.delete(test_shots, indices_to_delete, axis=2)
 
 # Model Hyperparameters
-cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
-transformer_kwargs = {
-    'num_heads': 1,  
-    'key_dim':32,  
-    'ff_dim': 32,  
-    'inner_dim': 64  
-}
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, clipnorm=1.0)
 batch_size = 32
+cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
+transformer_kwargs = {
+    'num_heads': 1,
+    'key_dim': 16,
+    'ff_dim': 16,
+    'inner_dim': 32
+}
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005, clipnorm=1.0)
 MODEL_NAME = 'proposedModal'
-MODEL_PATH = "./model/proposedModal/20250225-175135/final_model.weights.h5"
+MODEL_PATH = "best_model_fold_1.keras"
 
 #input data
 test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_hit_area ,test_player_area, test_opponent_area,test_rallies,test_masks]
@@ -66,7 +65,7 @@ test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_h
 # Build the Model
 model = rc.proposed_model(
     (seq_len, test_shots.shape[2]),
-    embed_types_size=len(type_mapping) + 1,
+    embed_types_size=12,
     embed_area_size=max(test_data['player_location_area'].nunique(), test_data['opponent_location_area'].nunique(),test_data['hit_area'].nunique()) + 1,  
     embed_player_size=27,
     rally_info_shape=len(rally_predictors),
@@ -80,25 +79,22 @@ model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=[
     ])
 
 if os.path.exists(MODEL_PATH):
-    prediction_model.load_weights(MODEL_PATH)
+    model.load_weights(MODEL_PATH)
     print(f"✅ Model weights loaded successfully: {MODEL_PATH}")
 else:
     print(f"❌ Model weights `{MODEL_PATH}` Does not exist, please execute `training.py` to train the model first!")
     exit()
 
 # Add Callbacks
-model_path = 'best_model.keras'
+model_path = 'best_test_model.keras'
 if os.path.exists(model_path):
     os.remove(model_path)  
 
 callbacks = [
-    EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True),
+    EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
     ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True, save_weights_only=False),
-    # shot_encoder_callback
 ]
 
 test_results = model.evaluate(test_x, test_target)
-y_pred = model.predict(test_x)
-br_score = model.brier_score(test_target, y_pred)
-
-print(f"Test Loss: {avg_loss:.4f} | Acc: {acc:.4f} | AUC: {auc:.4f} | Brier: {brier:.4f}")
+loss, auc, brier = test_results
+print(f"Test Loss: {loss:.4f} | AUC: {auc:.4f} | Brier: {brier:.4f}")
