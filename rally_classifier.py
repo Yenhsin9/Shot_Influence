@@ -99,54 +99,58 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
         embed_types_size=embed_types_size, embed_area_size=embed_area_size, embed_player_size=embed_player_size
     )
 
-    # ✅ CNN Feature Extraction with Masking
-    layer_cnn = StaggeredConv1D(name='Local_pattern_extraction', **cnn_kwargs)
-    pattern_sequence = layer_cnn(shot_encoder_output, mask=inputs[-1])
-    pattern_sequence = tf.keras.layers.Dropout(0.5)(pattern_sequence) 
-
     # ✅ Positional Encoding
     seq_len = shot_sequence_shape[0]
-    pos_encoding = Embedding(input_dim=seq_len, output_dim=pattern_sequence.shape[-1])(tf.range(seq_len))
-    pattern_sequence_with_pos = pattern_sequence + pos_encoding
+    pos_encoding = Embedding(input_dim=seq_len, output_dim=shot_encoder_output.shape[-1])(tf.range(seq_len))
+    pattern_sequence_with_pos = shot_encoder_output + pos_encoding
 
     # ✅ Transformer Encoder
     num_heads = transformer_kwargs['num_heads']
     seq_len = pattern_sequence_with_pos.shape[1]
 
-    #  (batch_size, 1, seq_len)
-    mask = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=1), 
-        output_shape=lambda s: (s[0], 1, s[1]), 
-        name='Expand_mask_dim_1'
-    )(inputs[-1])
+    # (batch, seq_len) → (batch, 1, seq_len)
+    mask = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=1),
+            output_shape=lambda s: (s[0], 1, s[1]))(inputs[-1])
 
-    # (batch_size, 1, 1, seq_len)
-    mask = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=1), 
-        output_shape=lambda s: (s[0], 1, 1, s[2]), 
-        name='Expand_mask_dim_2'
-    )(mask)
+    # (batch, 1, seq_len) → (batch, seq_len, seq_len)
+    mask = tf.keras.layers.Lambda(lambda x: tf.tile(x, [1, tf.shape(x)[2], 1]),
+    output_shape=lambda s: (s[0], s[2], s[2]),)(mask)
 
-    # Tile to (batch_size, num_heads, seq_len, seq_len)
-    mask = tf.keras.layers.Lambda(lambda x: tf.tile(x, [1, num_heads, 1, 1]), 
-        output_shape=lambda s: (s[0], num_heads, s[2], s[3]), 
-        name='Tile_mask_for_heads'
-    )(mask)
-
-    mha = MultiHeadAttention(num_heads=num_heads, key_dim=transformer_kwargs['key_dim'],kernel_regularizer=l2(0.01),dropout=0.3)
+    mha = MultiHeadAttention(num_heads=num_heads, key_dim=transformer_kwargs['key_dim'],kernel_regularizer=l2(0.001))
     attn_output, attn_weights = mha(
         pattern_sequence_with_pos, 
         pattern_sequence_with_pos, 
-        attention_mask=mask, 
+        attention_mask=mask,  # Masking
         return_attention_scores=True
     )
-    attn_output = LayerNormalization(epsilon=1e-6)(attn_output + pattern_sequence_with_pos)
+    attn_output = Dropout(0.3)(attn_output)
+    attn_output = tf.keras.layers.Add()([attn_output, pattern_sequence_with_pos])  # z + x
+    attn_output = tf.keras.layers.LayerNormalization(epsilon=1e-5)(attn_output) 
 
     # ✅ Feed Forward Network
-    ffn = Dense(transformer_kwargs['inner_dim'], activation=activations.gelu)(attn_output)  
-    ffn_output = Dense(transformer_kwargs['ff_dim'])(ffn)  
-    transformer_output = LayerNormalization(epsilon=1e-6)(ffn_output + attn_output)
+    ffn = Dense(transformer_kwargs['inner_dim'], activation='gelu')(attn_output)
+    ffn_output = Dense(attn_output.shape[-1])(ffn)
+    ffn_output = Dropout(0.3)(ffn_output)
+
+    ffn_output = tf.keras.layers.Add()([ffn_output, attn_output])
+    transformer_output = tf.keras.layers.LayerNormalization(epsilon=1e-5)(ffn_output)
+
+    # 擴展 mask 維度以對應 transformer_output
+    expanded_mask = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=2),
+            output_shape=lambda s: (s[0], s[1], 1))(inputs[-1])
+
+    # 將 padding 區設為 -inf，有效區保留原值
+    masked_output = tf.keras.layers.Lambda(
+        lambda args: tf.where(
+            tf.equal(args[0], 1),
+            args[1],
+            tf.fill(tf.shape(args[1]), tf.float32.min)
+        ),
+        output_shape=lambda s: s[1]
+    )([expanded_mask, transformer_output])
 
     # ✅ Max Pooling
-    rally_representation = tf.keras.layers.GlobalMaxPooling1D()(transformer_output)
+    rally_representation = tf.keras.layers.GlobalMaxPooling1D()(masked_output)
 
     # ✅ Concatenate with Rally Information
     layer_concat_rally = tf.keras.layers.Concatenate(name='Seq_rally_merging')([rally_representation, inputs[-2]])
