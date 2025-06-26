@@ -1,0 +1,11 @@
+最佳模型來自 Fold 4，驗證 AUC: 0.5501
+
+Average Validation Metrics Across Folds:
+Average Val Loss: 0.8486
+Average Val AUC: 0.5240
+Average Val Brier Score: 0.2797
+-----------------------------------------
+✅ Model weights loaded successfully: best_model_fold_4.keras
+2025-06-26 13:50:26.288832: I tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.cc:117] Plugin optimizer for device_type GPU is enabled.
+11/11 ━━━━━━━━━━━━━━━━━━━━ 1s 42ms/step - auc: 0.5526 - brier_score: 0.2582 - loss: 0.7998 
+Test Loss: 0.8087 | AUC: 0.5282 | Brier: 0.2623

@@ -49,7 +49,7 @@ def prepare_data(dataset: pd.DataFrame,
         # ====== (Time Proportion) ======
         rally['time_proportion'] = np.linspace(0, 1, len(rally))
 
-        tmp_getpoint_player = rally['getpoint_player'].iloc[-1]
+        tmp_getpoint_player = rally['is_target_win'].iloc[-1]
         # ====== (Score Difference) ======
         setid = rally['set'].iloc[-1]
         score_A = rally['roundscore_A'].iloc[-1]
@@ -62,7 +62,7 @@ def prepare_data(dataset: pd.DataFrame,
             consecutive_points = 0
         else:
             roundscore_diff = pre_diff
-            if last_getpoint_player == 'A':
+            if last_getpoint_player == 1:
                 consecutive_points += 1
             else:
                 consecutive_points = 0  
