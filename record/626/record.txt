@@ -1,0 +1,49 @@
+❯ python preprocess_data.py
+Show unique player: 
+['Kento MOMOTA', 'CHOU Tien Chen', 'CHEN Long', 'Anders ANTONSEN', 'Jonatan CHRISTIE', 'NG Ka Long Angus', 'SHI Yuqi', 'Viktor AXELSEN', 'Anthony Sinisuka GINTING', 'An Se Young', 'Ratchanok INTANON', 'Mia BLICHFELDT', 'Busanan ONGBAMRUNGPHAN', 'LEE Cheuk Yiu', 'Rasmus GEMKE', 'Carolina MARIN', 'Supanida KATETHONG', 'Pornpawee CHOCHUWONG', 'Sameer VERMA', 'Neslihan YIGIT', 'Hans-Kristian Solberg VITTINGHUS', 'LIEW Daren', 'PUSARLA V. Sindhu', 'LEE Zii Jia', 'Evgeniya KOSETSKAYA', 'Michelle LI', 'KIDAMBI Srikanth'] 27
+Original: 
+Current size
+        Unique rally: 3683       Total rows: 36484
+After Dropping flaw: 
+Current size
+        Unique rally: 2415       Total rows: 24962
+After dropping unknown ball type: 
+Current size
+        Unique rally: 2411       Total rows: 24958
+After converting hit_area: 
+Current size
+        Unique rally: 2372       Total rows: 24471
+After converting landing_area: 
+Current size
+        Unique rally: 2371       Total rows: 24431
+After converting ball type: 
+Current size
+        Unique rally: 2371       Total rows: 24431
+Show unique player: 
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26] 27
+========== Fold 1 Val not in Train =========
+{11, 12, 14}
+========== Fold 2 Val not in Train =========
+set()
+========== Fold 3 Val not in Train =========
+{19, 6}
+========== Fold 4 Val not in Train =========
+{10, 21}
+========== Fold 5 Val not in Train =========
+{24, 25, 18, 23}
+========== Test not in Train =========
+{16, 26}
+Fold 1 - Train rallies: 1176, Val rallies: 301
+Fold 2 - Train rallies: 1168, Val rallies: 309
+Fold 3 - Train rallies: 1208, Val rallies: 269
+Fold 4 - Train rallies: 1177, Val rallies: 300
+Fold 5 - Train rallies: 1179, Val rallies: 298
+Test rallies: 342
+------------------------------------------------------------
+Fold 5 - Final Val Loss: 0.7747, Val AUC: 0.5351, Val Brier Score: 0.2691
+最佳模型來自 Fold 2，驗證 AUC: 0.6014
+
+Average Validation Metrics Across Folds:
+Average Val Loss: 0.7549
+Average Val AUC: 0.5457
+Average Val Brier Score: 0.2622

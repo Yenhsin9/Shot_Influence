@@ -181,7 +181,7 @@ class PreDataProcessor:
         matches['landing_y'] = (matches['landing_y']-mean_y) / std_y
 
         # Remove some unrelated fields
-        matches = matches.drop(columns=['hit_height','hit_x','hit_y','opponent_location_x','opponent_location_y', 'win_reason', 'flaw', 'db'])
+        matches = matches.drop(columns=['hit_height','hit_x','hit_y','win_reason', 'flaw', 'db'])
 
         return matches
 
