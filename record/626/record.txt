@@ -1,0 +1,6 @@
+最佳模型來自 Fold 2，驗證 AUC: 0.5455
+
+Average Validation Metrics Across Folds:
+Average Val Loss: 0.8574
+Average Val AUC: 0.5264
+Average Val Brier Score: 0.2831
