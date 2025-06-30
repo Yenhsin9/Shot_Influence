@@ -38,15 +38,15 @@ for fold in range(1, num_folds + 1):
     rally_predictors = ['roundscore_diff', 'consecutive_points']
     target = 'is_target_win'
 
-    batch_size = 64
-    cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
+    batch_size = 128
+    cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.0001)}
     transformer_kwargs = {
         'num_heads': 1,
-        'key_dim': 32,
-        'ff_dim': 32,
-        'inner_dim': 64
+        'key_dim': 16,
+        'ff_dim': 16,
+        'inner_dim': 32
     }
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, clipnorm=1.0)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00007, clipnorm=1.0)
     print(f"\nTraining Fold {fold}...")
     epochs = 100
     # Load fold data
@@ -72,7 +72,7 @@ for fold in range(1, num_folds + 1):
         [rally_predictors, target, 'rally_id'],
         pad_to=seq_len
     )
-
+ 
     # Extract features
     train_player_id = train_shots[:, :, 6].copy()
     train_shot_type = train_shots[:, :, 0].copy()
@@ -139,9 +139,16 @@ for fold in range(1, num_folds + 1):
         batch_size=batch_size,
         verbose=1,
         callbacks=callbacks,
-        shuffle=True
+        #shuffle=True
     )
+    # 預測 validation 資料
+    y_pred = model.predict(val_x)
 
+    # 印出前幾筆預測
+    print("預測機率：", y_pred[:5].flatten())
+
+    # 同時印出真實 label
+    print("真實值：", val_target[:5].flatten())
     # Store metrics
     all_train_loss.append(history.history['loss'])
     all_val_loss.append(history.history['val_loss'])

@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint,Callback
 import os
 import csv
+from tensorflow.keras.models import load_model
 
 # Load Data
 test_data = pd.read_csv('./data/test.csv')
@@ -47,15 +48,15 @@ indices_to_delete = [0, 3, 4, 5, 6, 7]
 test_shots = np.delete(test_shots, indices_to_delete, axis=2)
 
 # Model Hyperparameters
-batch_size = 64
-cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
+batch_size = 128
+cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.0001)}
 transformer_kwargs = {
     'num_heads': 1,
-    'key_dim': 32,
-    'ff_dim': 32,
-    'inner_dim': 64
+    'key_dim': 16,
+    'ff_dim': 16,
+    'inner_dim': 32
 }
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, clipnorm=1.0)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.00007, clipnorm=1.0)
 MODEL_NAME = 'proposedModal'
 MODEL_PATH = "best_model_fold_3.keras"
 
@@ -66,7 +67,7 @@ test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_h
 model = rc.proposed_model(
     (seq_len, test_shots.shape[2]),
     embed_types_size=12,
-    embed_area_size=max(test_data['player_location_area'].nunique(), test_data['opponent_location_area'].nunique(),test_data['hit_area'].nunique()) + 1,  
+    embed_area_size=15 ,  #要改成一樣的
     embed_player_size=27,
     rally_info_shape=len(rally_predictors),
     cnn_kwargs=cnn_kwargs,

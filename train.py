@@ -72,6 +72,7 @@ def prepare_data(dataset: pd.DataFrame,
         pre_setid = setid
         rally['consecutive_points'] = consecutive_points
         rally['roundscore_diff'] = roundscore_diff
+        rally['is_target_win'] = tmp_getpoint_player=='A'
 
         if 'time_proportion' not in shot_attributes_f:
             shot_attributes_f.append('time_proportion')
