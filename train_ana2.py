@@ -38,17 +38,17 @@ for fold in range(1, num_folds + 1):
     rally_predictors = ['roundscore_diff', 'consecutive_points']
     target = 'is_target_win'
 
-    batch_size = 32
-    cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
+    batch_size = 128
+    cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.0001)}
     transformer_kwargs = {
         'num_heads': 1,
         'key_dim': 16,
         'ff_dim': 16,
         'inner_dim': 32
     }
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005, clipnorm=1.0)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001, clipnorm=1.0)
     print(f"\nTraining Fold {fold}...")
-    epochs = 200
+    epochs = 100
     # Load fold data
     train_data = pd.read_csv(f'./data/train_fold_{fold}.csv')
     val_data = pd.read_csv(f'./data/val_fold_{fold}.csv')
@@ -139,7 +139,7 @@ for fold in range(1, num_folds + 1):
         batch_size=batch_size,
         verbose=1,
         callbacks=callbacks,
-        shuffle=True
+        #shuffle=True
     )
 
     # Store metrics

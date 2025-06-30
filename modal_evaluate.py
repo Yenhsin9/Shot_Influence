@@ -47,17 +47,17 @@ indices_to_delete = [0, 3, 4, 5, 6, 7]
 test_shots = np.delete(test_shots, indices_to_delete, axis=2)
 
 # Model Hyperparameters
-batch_size = 32
-cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.01)}
+batch_size = 128
+cnn_kwargs = {'filters': 16, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.0001)}
 transformer_kwargs = {
     'num_heads': 1,
     'key_dim': 16,
     'ff_dim': 16,
     'inner_dim': 32
 }
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005, clipnorm=1.0)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001, clipnorm=1.0)
 MODEL_NAME = 'proposedModal'
-MODEL_PATH = "best_model_fold_4.keras"
+MODEL_PATH = "best_model_fold_2.keras"
 
 #input data
 test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_hit_area ,test_player_area, test_opponent_area,test_rallies,test_masks]
@@ -66,7 +66,7 @@ test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_h
 model = rc.proposed_model(
     (seq_len, test_shots.shape[2]),
     embed_types_size=12,
-    embed_area_size=max(test_data['player_location_area'].nunique(), test_data['opponent_location_area'].nunique(),test_data['hit_area'].nunique()) + 1,  
+    embed_area_size=15,  
     embed_player_size=27,
     rally_info_shape=len(rally_predictors),
     cnn_kwargs=cnn_kwargs,

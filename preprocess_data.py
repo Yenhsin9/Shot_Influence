@@ -16,8 +16,10 @@ class PreDataProcessor:
         # convert players to categorical values (anonymize)
         self.show_unique_players()
         #1/0
-        self.match['winner'] = self.match['winner'].apply(lambda x: self.unique_players.index(x))
-        self.match['loser'] = self.match['loser'].apply(lambda x: self.unique_players.index(x))
+        self.player_map = {name: idx + 1 for idx, name in enumerate(self.unique_players)}  # 建立從 1 開始的 map
+
+        self.match['winner'] = self.match['winner'].map(self.player_map)
+        self.match['loser'] = self.match['loser'].map(self.player_map)
 
         self.homography = pd.read_csv(f"{path}homography.csv")
         #self.homography = self.homography.drop(columns=['video', 'db'])
@@ -236,31 +238,53 @@ class CoachAITrainTestSplit:
         self.given_strokes_num = 4
         self.path = path
 
-        # 獲取所有唯一比賽 ID
-        match_ids = self.metadata['match_id'].unique()
+        type_codes, type_uniques = pd.factorize(self.metadata['type'])
+        self.metadata['type'] = type_codes + 1
+        
+        test_index = []
+        train_val_index=[]
 
-        # 分割為訓練+驗證集（80%）和測試集（20%）
-        train_val_ids, test_ids = train_test_split(match_ids, test_size=0.2, random_state=42)
+        for match_id in self.metadata['match_id'].unique():
+            match = self.metadata[self.metadata['match_id']==match_id]
 
-        # 儲存測試集
-        self.match_test = self.metadata[self.metadata['match_id'].isin(test_ids)]
-        self.match_test.to_csv(os.path.join(path, 'test.csv'), index=False)
+            rally_index = match['rally_id'].unique()
+            np.random.shuffle(rally_index) 
+            train_num = int(len(rally_index) * 0.6)
+            valid_num = int(len(rally_index) * 0.2)
+            train_val_num = train_num + valid_num
 
-        # 在訓練+驗證集上進行 5 折交叉驗證
-        kf = KFold(n_splits=5, shuffle=True, random_state=42)
-        fold = 1
-        for train_idx, val_idx in kf.split(train_val_ids):
-            train_fold_ids = train_val_ids[train_idx]
-            val_fold_ids = train_val_ids[val_idx]
+            train_val_index.extend(rally_index[:train_val_num])
+            test_index.extend(rally_index[train_val_num:])
 
-            # 生成訓練集和驗證集
-            match_train = self.metadata[self.metadata['match_id'].isin(train_fold_ids)]
-            match_val = self.metadata[self.metadata['match_id'].isin(val_fold_ids)]
+        train_val_index = np.array(train_val_index)
+        test_index = np.array(test_index)
 
-            # 儲存每個折的訓練集和驗證集
-            match_train.to_csv(os.path.join(path, f'train_fold_{fold}.csv'), index=False)
-            match_val.to_csv(os.path.join(path, f'val_fold_{fold}.csv'), index=False)
-            fold += 1
+        assert len(np.intersect1d(train_val_index, test_index)) == 0, "Overlap detected between train_val_rally_ids and test_rally_ids!"
+        test_rally_data = self.metadata[self.metadata['rally_id'].isin(test_index)].reset_index(drop=True)
+        test_rally_data.to_csv(os.path.join(path, 'test.csv'), index=False)
+
+        # 初始化 KFold
+        kf = KFold(n_splits=5, shuffle=True, random_state=22)
+        fold_datasets = []
+        
+        # 基于 rally_ids 进行普通 K-Fold 分割
+        for fold, (train_idx, val_idx) in enumerate(kf.split(train_val_index)):
+            train_rally_ids = train_val_index[train_idx]
+            val_rally_ids = train_val_index[val_idx]
+        
+            # 提取训练和验证数据
+            train_rally_data = self.metadata[self.metadata['rally_id'].isin(train_rally_ids)].reset_index(drop=True)
+            valid_rally_data = self.metadata[self.metadata['rally_id'].isin(val_rally_ids)].reset_index(drop=True)
+            
+            # 检查数据泄漏
+            assert len(np.intersect1d(train_rally_ids, val_rally_ids)) == 0, "Overlap detected between train_rally_ids and val_rally_ids!"
+            
+            # 检查 player_id 分布
+            print(f"Fold {fold + 1} Train player distribution:\n", train_rally_data['player'].value_counts(normalize=True).sort_index())
+            print(f"Fold {fold + 1} Validation player distribution:\n", valid_rally_data['player'].value_counts(normalize=True).sort_index())
+
+            train_rally_data.to_csv(os.path.join(path, f'train_fold_{fold+1}.csv'), index=False)
+            valid_rally_data.to_csv(os.path.join(path, f'val_fold_{fold+1}.csv'), index=False)
 
         # 檢查驗證集和測試集中的玩家是否出現在訓練集中
         for fold in range(1, 6):
@@ -270,7 +294,7 @@ class CoachAITrainTestSplit:
             val_players = set(val_data['player'].unique())
             print(f'========== Fold {fold} Val not in Train =========')
             print(val_players - train_players)
-        test_players = set(self.match_test['player'].unique())
+        test_players = set(test_rally_data['player'].unique())
         print('========== Test not in Train =========')
         print(test_players - train_players)
 
