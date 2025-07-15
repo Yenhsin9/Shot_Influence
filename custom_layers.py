@@ -3,6 +3,7 @@ from tensorflow.keras.initializers import HeNormal
 import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import Callback
 import csv
+
 class StaggeredConv1D(tf.keras.layers.Layer):
     """Layers which use two CNNs to scan alternately and provide intermediate outputs for visualization."""
     
@@ -18,7 +19,6 @@ class StaggeredConv1D(tf.keras.layers.Layer):
             padding='same', 
             **kwargs
         )
-
         self.conv1d_b = tf.keras.layers.Conv1D(
             self.filters, 
             self.kernel_size, 
@@ -28,30 +28,35 @@ class StaggeredConv1D(tf.keras.layers.Layer):
     
     def call(self, inputs, training=None, mask=None):
         """Forward pass with optional intermediate output for visualization."""
-        if mask is not None:
-            mask = tf.cast(mask, tf.float32)  
-            mask = tf.expand_dims(mask, axis=-1)  
-            inputs = inputs * mask  
+        # 假設 inputs 的形狀為 (batch_size, timesteps, 48)
+        # 玩家標籤位於索引 45 (第 46 個特徵通道，1 for A, 2 for B, 0 for padding)
+        features = tf.concat([inputs[:, :, :45], inputs[:, :, 46:]], axis=-1)  # 移除標籤通道，形狀 (batch_size, timesteps, 47)
+        labels = inputs[:, :, 45]  # 提取玩家標籤，形狀 (batch_size, timesteps)
 
-        inputs_a = inputs[:, ::2, :] 
-        inputs_b = inputs[:, 1::2, :]  
-        
-        conv_a = self.conv1d_a(inputs_a) 
-        conv_b = self.conv1d_b(inputs_b) 
+        # 創建 A 和 B 的遮罩
+        mask_a = tf.cast(tf.equal(labels, 1), tf.float32)  # Player A 的遮罩
+        mask_b = tf.cast(tf.equal(labels, 2), tf.float32)  # Player B 的遮罩
+        mask_a = tf.expand_dims(mask_a, axis=-1)  # (batch_size, timesteps, 1)
+        mask_b = tf.expand_dims(mask_b, axis=-1)
 
-        max_length = tf.maximum(tf.shape(conv_a)[1], tf.shape(conv_b)[1])
+        # 對 A 和 B 分別應用卷積
+        inputs_a = features * mask_a  # 僅保留 A 的時間步
+        inputs_b = features * mask_b  # 僅保留 B 的時間步
+        conv_a = self.conv1d_a(inputs_a)  # 對 A 應用 conv1d_a
+        conv_b = self.conv1d_b(inputs_b)  # 對 B 應用 conv1d_b
 
-        padded_conv_a = tf.pad(conv_a, [[0, 0], [0, max_length - tf.shape(conv_a)[1]], [0, 0]])
-        padded_conv_b = tf.pad(conv_b, [[0, 0], [0, max_length - tf.shape(conv_b)[1]], [0, 0]])
+        # 合併結果，保持原始順序
+        staggered = conv_a + conv_b  # 因為 mask_a 和 mask_b 互斥，直接相加
 
-        staggered = tf.reshape(tf.stack([padded_conv_a, padded_conv_b], axis=-2), 
-                            (tf.shape(inputs)[0], max_length * 2, self.filters))
+        # 應用 padding 遮罩（標籤為 0 的時間步）
+        padding_mask = tf.cast(tf.not_equal(labels, 0), tf.float32)
+        padding_mask = tf.expand_dims(padding_mask, axis=-1)
+        staggered = staggered * padding_mask  # 將 padding 時間步設為 0
 
-        
         return tf.cast(staggered, tf.float32)
-
+    
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[1], self.filters)  
+        return (input_shape[0], input_shape[1], self.filters)
 
     def get_config(self):
         config = super().get_config()
@@ -60,24 +65,3 @@ class StaggeredConv1D(tf.keras.layers.Layer):
             "kernel_size": self.kernel_size,
         })
         return config
-    
-
-# def save_to_csvb(self, x):
-#         """Save tensor to CSV file."""
-#         filename="inputInCNNConB.csv"
-#         try:
-#             np_array = x.numpy()  # 轉為 numpy array
-#             print(f"Saving to {filename}, shape:", np_array.shape)
-#             with open(filename, mode='w', newline='') as file:
-#                 writer = csv.writer(file)
-#                 for sample in np_array:
-#                     for row in sample:
-#                         writer.writerow(row)
-#         except Exception as e:
-#             print(f"Error saving to {filename}:", e)
-#         return x
-
-# tmp = staggered
-#         tmp = tf.keras.layers.Lambda(
-#             lambda x: tf.py_function(self.save_to_csvfinal, [x], tf.float32)
-#         )(tmp)
