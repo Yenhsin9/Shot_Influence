@@ -38,10 +38,6 @@ def prepare_data(dataset: pd.DataFrame,
     shot_attributes_f = util.flatten(shot_attributes)
     rally_attributes_f = util.flatten(rally_attributes)
 
-    pre_setid = None
-    consecutive_points = 0
-    last_getpoint_player = None
-    pre_diff = 0
     for rally_id, rally in dataset.groupby('rally_id'):
         if min_len > 0 and len(rally) < min_len:
             continue
@@ -49,37 +45,13 @@ def prepare_data(dataset: pd.DataFrame,
         # ====== (Time Proportion) ======
         rally['time_proportion'] = np.linspace(0, 1, len(rally))
 
-        tmp_getpoint_player = rally['getpoint_player'].iloc[-1]
-        # ====== (Score Difference) ======
-        setid = rally['set'].iloc[-1]
-        score_A = rally['roundscore_A'].iloc[-1]
-        score_B = rally['roundscore_B'].iloc[-1]
-        tmpdiff = score_A-score_B
-            
-         # (Consecutive Points)
-        if setid != pre_setid: 
-            roundscore_diff = 0
-            consecutive_points = 0
-        else:
-            roundscore_diff = pre_diff
-            if last_getpoint_player == 'A':
-                consecutive_points += 1
-            else:
-                consecutive_points = 0  
+        getpoint_player = rally['getpoint_player'].iloc[-1]
+        rally['is_target_win'] = 1 if (getpoint_player == 'A') else 0
 
-        pre_diff = tmpdiff
-        last_getpoint_player = tmp_getpoint_player
-        pre_setid = setid
-        rally['consecutive_points'] = consecutive_points
-        rally['roundscore_diff'] = roundscore_diff
-        rally['is_target_win'] = tmp_getpoint_player=='A'
+        rally['player'] = np.where(rally['player'].values == 'A', 1, 2)
 
         if 'time_proportion' not in shot_attributes_f:
             shot_attributes_f.append('time_proportion')
-        if 'roundscore_diff' not in rally_attributes_f:
-            rally_attributes_f.append('roundscore_diff')
-        if 'consecutive_points' not in rally_attributes_f:
-            rally_attributes_f.append('consecutive_points')
 
         shots.append(rally[shot_attributes_f].values.astype('float32'))
         rally_features = rally[rally_attributes_f].values[-1].astype('float32')

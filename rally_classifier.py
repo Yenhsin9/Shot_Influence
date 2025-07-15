@@ -26,14 +26,9 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
     input_hit_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Hit_area_input')
     input_player_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Player_area_input')
     input_opponent_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Opponent_area_input')
-    input_player_id = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Player_input')
+    input_player_id = tf.keras.Input(shape=(shot_sequence_shape[0],1), name='Player_input')
     input_rally = tf.keras.Input(shape=(rally_info_shape,), name='Rally_input')
     input_masks = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Mask_input')
-
-    # ✅ Player Embedding
-    if embed_player_size is not None:
-        player_embedding = tf.keras.layers.Embedding(input_dim=embed_player_size, output_dim=15, mask_zero=True, name='Player_embedding',embeddings_initializer=tf.keras.initializers.RandomUniform(minval=-1, maxval=1))
-        embedded_player = player_embedding(input_player_id)  # (None, 66, 15)
 
     # ✅ Location Embedding (Hit Area, Player Area, Opponent Area)
     if embed_area_size is not None:
@@ -76,7 +71,7 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
  
     # ✅ **Concatenate Player Embedding, Location Embedding, and Enhanced Shot Features (Shot Encoder Output)**
     shot_encoder_output = tf.keras.layers.Concatenate(name='Shot_encoder_output')([
-        embedded_hit_area, embedded_player_area, embedded_opponent_area, enhanced_shot_features, embedded_player,input_shots
+        embedded_hit_area, embedded_player_area, embedded_opponent_area, enhanced_shot_features, input_player_id,input_shots
     ])
 
     return [input_shots,input_shot_types,input_player_id,input_time_proportion, input_hit_area, input_player_area, input_opponent_area, 
@@ -87,7 +82,6 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
 def proposed_model(shot_sequence_shape: Tuple[int, int], 
                    embed_types_size: int = None,
                    embed_area_size: int = None,
-                   embed_player_size: int = None, 
                    rally_info_shape: int = None,
                    cnn_kwargs: Dict[str, Any] = {'filters': 32, 'kernel_size': 3},
                    transformer_kwargs: Dict[str, Any] = {},
@@ -96,7 +90,7 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     # ✅ Get Processed Inputs and Shot Encoder Output
     inputs, shot_encoder_output = preprocess_inputs(
         shot_sequence_shape, rally_info_shape,
-        embed_types_size=embed_types_size, embed_area_size=embed_area_size, embed_player_size=embed_player_size
+        embed_types_size=embed_types_size, embed_area_size=embed_area_size, 
     )
 
     # ✅ Positional Encoding
@@ -131,14 +125,14 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
         attention_mask=mask,  # Masking
         return_attention_scores=True
     )
-    attn_output = Dropout(0.2)(attn_output)
+    attn_output = Dropout(0.5)(attn_output)
     attn_output = tf.keras.layers.Add()([attn_output, pattern_sequence_with_pos])  # z + x
     attn_output = tf.keras.layers.LayerNormalization(epsilon=1e-5)(attn_output) 
 
     # ✅ Feed Forward Network
     ffn = Dense(transformer_kwargs['inner_dim'], activation='gelu')(attn_output)
     ffn_output = Dense(attn_output.shape[-1])(ffn)
-    ffn_output = Dropout(0.2)(ffn_output)
+    ffn_output = Dropout(0.5)(ffn_output)
 
     ffn_output = tf.keras.layers.Add()([ffn_output, attn_output])
     transformer_output = tf.keras.layers.LayerNormalization(epsilon=1e-5)(ffn_output)
@@ -163,7 +157,7 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     # ✅ Concatenate with Rally Information
     layer_concat_rally = tf.keras.layers.Concatenate(name='Seq_rally_merging')([rally_representation, inputs[-2]])
     # ✅ Final Dense Layer
-    output_win_prob = Dense(1, activation='sigmoid', kernel_regularizer=l2(0.0001))(layer_concat_rally)
+    output_win_prob = Dense(1, activation='sigmoid', kernel_regularizer=l2(0.001))(layer_concat_rally)
  
     model_predict = tf.keras.Model(inputs=inputs, outputs=output_win_prob)
     return model_predict
