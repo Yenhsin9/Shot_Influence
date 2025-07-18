@@ -38,6 +38,12 @@ def prepare_data(dataset: pd.DataFrame,
     shot_attributes_f = util.flatten(shot_attributes)
     rally_attributes_f = util.flatten(rally_attributes)
 
+    for col in ['player_location_area', 'opponent_location_area', 'hit_area']:
+        if col in dataset.columns:
+            dataset[col] = dataset[col].fillna(0).astype(float)  # Replace NaN with 0
+            dataset[col] = dataset[col].apply(lambda x: 10.0 if x >= 10 else x)  # Cap values >= 10 to 10.0
+            dataset[col] = dataset[col].astype(int)
+            
     for rally_id, rally in dataset.groupby('rally_id'):
         if min_len > 0 and len(rally) < min_len:
             continue

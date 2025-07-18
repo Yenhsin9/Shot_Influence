@@ -41,6 +41,7 @@ for fold in range(1, num_folds + 1):
     target = 'is_target_win'
 
     batch_size = 64
+    dropout_rate = 0.2
     cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.0001)}
     transformer_kwargs = {
         'num_heads': 1,
@@ -111,6 +112,7 @@ for fold in range(1, num_folds + 1):
         rally_info_shape=len(rally_predictors),
         cnn_kwargs=cnn_kwargs,
         transformer_kwargs=transformer_kwargs,
+        dropout_rate=dropout_rate
     )
 
     model.compile(
