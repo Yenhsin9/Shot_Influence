@@ -2,11 +2,11 @@
 from typing import Tuple, Dict, Any
 import tensorflow as tf
 import keras_self_attention
-from prosenet.model import ProSeNet
-from keras_ordered_neurons import ONLSTM
-from keras_pos_embd import TrigPosEmbedding
-from keras_transformer import get_encoders
-from keras_transformer.gelu import gelu
+# from prosenet.model import ProSeNet
+# from keras_ordered_neurons import ONLSTM
+# from keras_pos_embd import TrigPosEmbedding
+# from keras_transformer import get_encoders
+# from keras_transformer.gelu import gelu
 from tensorflow.keras.layers import MultiHeadAttention, Dense, LayerNormalization, Dropout, Embedding
 from custom_layers import StaggeredConv1D
 import tensorflow.keras.activations as activations
@@ -85,6 +85,8 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
                    rally_info_shape: int = None,
                    cnn_kwargs: Dict[str, Any] = {'filters': 32, 'kernel_size': 3},
                    transformer_kwargs: Dict[str, Any] = {},
+                   dropout_rate: float = 0.2,
+                   l2_lambda: float = 1e-4,
                    dense_kwargs: Dict[str, Any] = {}) -> tf.keras.Model:
 
     # ✅ Get Processed Inputs and Shot Encoder Output
@@ -118,21 +120,21 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     # mask = tf.keras.layers.Lambda(lambda x: tf.tile(x, [1, tf.shape(x)[2], 1]),
     # output_shape=lambda s: (s[0], s[2], s[2]),)(mask)
 
-    mha = MultiHeadAttention(num_heads=num_heads, key_dim=transformer_kwargs['key_dim'],kernel_regularizer=l2(0.0001))
+    mha = MultiHeadAttention(num_heads=num_heads, key_dim=transformer_kwargs['key_dim'])
     attn_output, attn_weights = mha(
         pattern_sequence_with_pos, 
         pattern_sequence_with_pos, 
         attention_mask=mask,  # Masking
         return_attention_scores=True
     )
-    attn_output = Dropout(0.5)(attn_output)
+    attn_output = Dropout(dropout_rate)(attn_output)
     attn_output = tf.keras.layers.Add()([attn_output, pattern_sequence_with_pos])  # z + x
     attn_output = tf.keras.layers.LayerNormalization(epsilon=1e-5)(attn_output) 
 
     # ✅ Feed Forward Network
     ffn = Dense(transformer_kwargs['inner_dim'], activation='gelu')(attn_output)
     ffn_output = Dense(attn_output.shape[-1])(ffn)
-    ffn_output = Dropout(0.5)(ffn_output)
+    ffn_output = Dropout(dropout_rate)(ffn_output)
 
     ffn_output = tf.keras.layers.Add()([ffn_output, attn_output])
     transformer_output = tf.keras.layers.LayerNormalization(epsilon=1e-5)(ffn_output)
@@ -156,8 +158,8 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
 
     # ✅ Concatenate with Rally Information
     layer_concat_rally = tf.keras.layers.Concatenate(name='Seq_rally_merging')([rally_representation, inputs[-2]])
-    # ✅ Final Dense Layer
-    output_win_prob = Dense(1, activation='sigmoid', kernel_regularizer=l2(0.001))(layer_concat_rally)
+    # ✅ Final Dense Layer with L2 regularization
+    output_win_prob = Dense(1, activation='sigmoid', kernel_regularizer=l2(l2_lambda))(layer_concat_rally)
  
     model_predict = tf.keras.Model(inputs=inputs, outputs=output_win_prob)
     return model_predict

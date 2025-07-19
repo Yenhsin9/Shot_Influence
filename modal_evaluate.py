@@ -49,16 +49,18 @@ test_shots = np.delete(test_shots, indices_to_delete, axis=2)
 
 # Model Hyperparameters
 batch_size = 128
-cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.0001)}
+drop_rate =0.5405
+l2_lambda = 2.315771065542536e-05
+cnn_kwargs = {'filters': 16, 'kernel_size': 4, 'kernel_regularizer': tf.keras.regularizers.l2(0.00017)}
 transformer_kwargs = {
-    'num_heads': 1,
-    'key_dim': 32,
-    'ff_dim': 32,
-    'inner_dim': 64
+    'num_heads': 2,
+    'key_dim': 16,
+    'ff_dim': 16,
+    'inner_dim': 128
 }
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005, clipnorm=1.0)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0076, clipnorm=1.0)
 MODEL_NAME = 'proposedModal'
-MODEL_PATH = "best_model_fold_1.keras"
+MODEL_PATH = "best_model_fold_2.keras"
 
 #input data
 test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_hit_area ,test_player_area, test_opponent_area,test_rallies,test_masks]
@@ -67,7 +69,7 @@ test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_h
 model = rc.proposed_model(
     (seq_len, test_shots.shape[2]),
     embed_types_size=12,
-    embed_area_size=15 ,  #要改成一樣的
+    embed_area_size=12,
     rally_info_shape=len(rally_predictors),
     cnn_kwargs=cnn_kwargs,
     transformer_kwargs=transformer_kwargs,
@@ -91,7 +93,7 @@ if os.path.exists(model_path):
     os.remove(model_path)  
 
 callbacks = [
-    EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
+    EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),
     ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True, save_weights_only=False),
 ]
 
