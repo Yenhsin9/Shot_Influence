@@ -8,7 +8,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import os
 import draw_plot
 
-num_folds = 1
+num_folds = 5
 
 # Compute type_mapping using all train folds
 all_train_data = pd.concat([pd.read_csv(f'./data/train_fold_{fold}.csv') for fold in range(1, num_folds + 1)], ignore_index=True)
@@ -24,16 +24,24 @@ seq_len = max(
 seq_len += 1 if seq_len % 2 == 1 else 2
 print(f"Sequence length: {seq_len}")
 
+# Initialize lists to store metrics for all folds
+all_train_loss = []
+all_val_loss = []
+all_train_auc = []
+all_val_auc = []
+all_train_brier = []
+all_val_brier = []
+final_val_aucs = []  # To store final validation AUC for each fold
+
 # 5-fold cross-validation loop
 for fold in range(1, num_folds + 1):
-    # Initialize lists to store metrics for all folds
-    all_train_loss = []
-    all_val_loss = []
-    all_train_auc = []
-    all_val_auc = []
-    all_train_brier = []
-    all_val_brier = []
-    final_val_aucs = []  # To store final validation AUC for each fold
+
+    fold_train_loss = []
+    fold_val_loss = []
+    fold_train_auc = []
+    fold_val_auc = []
+    fold_train_brier = []
+    fold_val_brier = []
 
     # Define hyperparameters and configurations
     shot_predictors = ['type', 'backhand', 'aroundhead', 'hit_area', 'player_location_area', 'opponent_location_area', 'player']
@@ -41,15 +49,16 @@ for fold in range(1, num_folds + 1):
     target = 'is_target_win'
 
     batch_size = 64
-    dropout_rate = 0.2
-    cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.0001)}
+    drop_rate = 0.3604
+    l2_lambda = 0.00086
+    cnn_kwargs = {'filters': 32, 'kernel_size': 2, 'kernel_regularizer': tf.keras.regularizers.l2(3.390804752248029e-05)}
     transformer_kwargs = {
         'num_heads': 1,
         'key_dim': 32,
         'ff_dim': 32,
-        'inner_dim': 64
+        'inner_dim':32,
     }
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0003, clipnorm=1.0)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.000185, clipnorm=1.0)
     print(f"\nTraining Fold {fold}...")
     epochs = 100
     # Load fold data
@@ -112,7 +121,8 @@ for fold in range(1, num_folds + 1):
         rally_info_shape=len(rally_predictors),
         cnn_kwargs=cnn_kwargs,
         transformer_kwargs=transformer_kwargs,
-        dropout_rate=dropout_rate
+        dropout_rate=drop_rate,
+        l2_lambda=l2_lambda,
     )
 
     model.compile(
@@ -124,17 +134,13 @@ for fold in range(1, num_folds + 1):
         ]
     )
 
-    # Define callbacks
-    model_path = f'best_model_fold_{fold}.keras'
-    if os.path.exists(model_path):
-        os.remove(model_path)
+    model_path = f'best_model_fold_{fold}'
+
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
-        ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True, save_weights_only=False),
+        EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),
+        ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True,  save_weights_only=False),  
     ]
-    print("Train X shapes:", [x.shape for x in train_x])
-    print("Train target shape:", train_target.shape)
-    # Train model
+
     history = model.fit(
         train_x, train_target,
         validation_data=(val_x, val_target),
@@ -142,45 +148,49 @@ for fold in range(1, num_folds + 1):
         batch_size=batch_size,
         verbose=1,
         callbacks=callbacks,
-        #shuffle=True
     )
-    # 預測 validation 資料
-    y_pred = model.predict(val_x)
+    # Store metrics for this fold
+    fold_train_loss.extend(history.history['loss'])
+    fold_val_loss.extend(history.history['val_loss'])
+    fold_train_auc.extend(history.history['auc'])
+    fold_val_auc.extend(history.history['val_auc'])
+    fold_train_brier.extend(history.history['brier_score'])
+    fold_val_brier.extend(history.history['val_brier_score'])
 
-    # 印出前幾筆預測
-    print("預測機率：", y_pred[:5].flatten())
-
-    # 同時印出真實 label
-    print("真實值：", val_target[:5].flatten())
-    # Store metrics
-    all_train_loss.extend(history.history['loss'])
-    all_val_loss.extend(history.history['val_loss'])
-    all_train_auc.extend(history.history['auc'])
-    all_val_auc.extend(history.history['val_auc'])
-    all_train_brier.extend(history.history['brier_score'])
-    all_val_brier.extend(history.history['val_brier_score'])
-
-    print('all_train_loss:', all_train_loss)
+    # Append fold metrics to the global lists
+    all_train_loss.append(fold_train_loss)
+    all_val_loss.append(fold_val_loss)
+    all_train_auc.append(fold_train_auc)
+    all_val_auc.append(fold_val_auc)
+    all_train_brier.append(fold_train_brier)
+    all_val_brier.append(fold_val_brier)
+    
     # Print final validation metrics
-    print(f"Fold {fold} - Final Val Loss: {history.history['val_loss'][-1]:.4f}, "
-          f"Val AUC: {history.history['val_auc'][-1]:.4f}, "
-          f"Val Brier Score: {history.history['val_brier_score'][-1]:.4f}")
+    print(f"Fold {fold} - Best Val Loss: {min(fold_val_loss):.4f}, "
+          f"Best Val AUC: {max(fold_val_auc):.4f}, "
+          f"Best Val Brier Score: {min(fold_val_brier):.4f}")
 
     # Plotting Training and Validation Loss
     draw_plot.draw_plot(
-        all_train_auc, all_val_auc, all_train_brier, all_val_brier, all_train_loss, all_val_loss
+        fold_train_auc, fold_val_auc, fold_train_brier, fold_val_brier, fold_train_loss, fold_val_loss
     )
 
-# Identify the best fold based on validation AUC
-if all_val_auc:
-    best_fold = np.argmax(all_val_auc) + 1
-    best_auc = max(all_val_auc)
-    print(f"最佳模型來自 Fold {best_fold}，驗證 AUC: {best_auc:.4f}")
+# 提取每個 fold 的最佳 AUC
+best_aucs_per_fold = [max(fold_auc) for fold_auc in all_val_auc]
+best_loss_per_fold = [min(fold_loss) for fold_loss in all_val_loss]
+best_brier_per_fold = [min(fold_brier) for fold_brier in all_val_brier]
+
+# 找到最佳 fold
+if best_aucs_per_fold:
+    best_fold_idx = np.argmax(best_aucs_per_fold)
+    best_fold = best_fold_idx + 1  # 因為 fold 從 1 開始
+    best_auc = best_aucs_per_fold[best_fold_idx]
+    print(f"最佳模型來自 Fold {best_fold}，訓練 AUC: {best_auc:.4f}")
 
 # Compute average validation metrics
-avg_val_loss = np.mean([history[-1] for history in all_val_loss])
-avg_val_auc = np.mean([history[-1] for history in all_val_auc])
-avg_val_brier = np.mean([history[-1] for history in all_val_brier])
+avg_val_loss = np.mean(best_loss_per_fold)
+avg_val_auc = np.mean(best_aucs_per_fold)
+avg_val_brier = np.mean(best_brier_per_fold)
 print("\nAverage Validation Metrics Across Folds:")
 print(f"Average Val Loss: {avg_val_loss:.4f}")
 print(f"Average Val AUC: {avg_val_auc:.4f}")

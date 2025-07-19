@@ -20,8 +20,7 @@ shot_predictors = ['type', 'backhand', 'aroundhead',
 rally_predictors = ['score_diff', 'consecutive_points']  
 target = 'is_target_win'
 
-seq_len = test_data.groupby('rally_id').size().max()
-seq_len += 1 if seq_len % 2 == 1 else 2 
+seq_len = 72
 
 # Encode 'type' columns
 codes_test, uniques_test = pd.factorize(test_data['type'])
@@ -49,28 +48,35 @@ test_shots = np.delete(test_shots, indices_to_delete, axis=2)
 
 # Model Hyperparameters
 batch_size = 64
-cnn_kwargs = {'filters': 32, 'kernel_size': 3, 'kernel_regularizer': tf.keras.regularizers.l2(0.0001)}
+drop_rate = 0.3604
+l2_lambda = 0.00086
+cnn_kwargs = {'filters': 32, 'kernel_size': 2, 'kernel_regularizer': tf.keras.regularizers.l2(3.390804752248029e-05)}
 transformer_kwargs = {
     'num_heads': 1,
     'key_dim': 32,
     'ff_dim': 32,
-    'inner_dim': 64
+    'inner_dim':32,
 }
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0003, clipnorm=1.0)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.000185, clipnorm=1.0)
 MODEL_NAME = 'proposedModal'
-MODEL_PATH = "best_model_fold_1.keras"
+MODEL_PATH = "best_model_fold_3"
 
 #input data
 test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_hit_area ,test_player_area, test_opponent_area,test_rallies,test_masks]
 
-# Build the Model
+# Build model
 model = rc.proposed_model(
     (seq_len, test_shots.shape[2]),
-    embed_types_size=12,
-    embed_area_size=15 ,  #要改成一樣的
+    embed_types_size=len(type_mapping) + 1,
+    embed_area_size=max(
+        test_data['player_location_area'].nunique(), test_data['opponent_location_area'].nunique(),
+        test_data['hit_area'].nunique(),
+    ) + 1,
     rally_info_shape=len(rally_predictors),
     cnn_kwargs=cnn_kwargs,
     transformer_kwargs=transformer_kwargs,
+    dropout_rate=drop_rate,
+    l2_lambda=l2_lambda,
 )
 
 model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=[
@@ -79,21 +85,11 @@ model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=[
     ])
 
 if os.path.exists(MODEL_PATH):
-    model.load_weights(MODEL_PATH)
+    model = tf.keras.models.load_model(MODEL_PATH)
     print(f"✅ Model weights loaded successfully: {MODEL_PATH}")
 else:
     print(f"❌ Model weights `{MODEL_PATH}` Does not exist, please execute `training.py` to train the model first!")
     exit()
-
-# Add Callbacks
-model_path = 'best_test_model.keras'
-if os.path.exists(model_path):
-    os.remove(model_path)  
-
-callbacks = [
-    EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
-    ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True, save_weights_only=False),
-]
 
 test_results = model.evaluate(test_x, test_target)
 loss, auc, brier = test_results

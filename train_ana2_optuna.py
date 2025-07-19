@@ -28,8 +28,8 @@ def run_trial(trial):
     ff_dim = filters
     num_heads = trial.suggest_categorical("num_heads", [1, 2, 4])
     inner_dim = trial.suggest_categorical("inner_dim", [32, 64, 128])
-    learning_rate = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
-
+    learning_rate = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
+    l2_lambda = trial.suggest_float("l2_lambda", 1e-6, 1e-3, log=True)
     cnn_kwargs = {
         "filters": filters,
         "kernel_size": kernel_size,
@@ -106,7 +106,8 @@ def run_trial(trial):
         rally_info_shape=len(rally_predictors),
         cnn_kwargs=cnn_kwargs,
         transformer_kwargs=transformer_kwargs,
-        dropout_rate=dropout_rate
+        dropout_rate=dropout_rate,
+        l2_lambda=l2_lambda,
     )
 
     model.compile(
@@ -114,7 +115,7 @@ def run_trial(trial):
         loss='binary_crossentropy',
         metrics=[tf.keras.metrics.AUC(name='auc'), tf.keras.metrics.MeanSquaredError(name='brier_score')]
     )
-
+    
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),
     ]
@@ -128,15 +129,32 @@ def run_trial(trial):
         callbacks=callbacks,
     )
 
-    val_auc = history.history['val_auc'][-1]
-    print(f"Trial complete. Val AUC: {val_auc:.4f}")
-    return val_auc
+    val_auc = history.history['val_auc']
+    val_loss = history.history['val_loss']
+
+    avg_auc = np.mean(val_auc[-5:])
+    avg_loss = np.mean(val_loss[-5:])
+    std_auc = np.std(val_auc)
+    std_loss = np.std(val_loss)
+
+    # 刪除 best_model.keras 檔案
+    if os.path.exists("best_model_fold_1.keras"):
+        os.remove("best_model_fold_1.keras")
+
+    return  avg_loss, std_loss
 
 if __name__ == "__main__":
-    study = optuna.create_study(direction="maximize")
+    study = optuna.create_study(directions=["minimize", "minimize"])
     study.optimize(run_trial, n_trials=30)
 
-    print("\n✅ 最佳參數組合:")
-    for k, v in study.best_params.items():
-        print(f"{k}: {v}")
-    print(f"📈 最佳驗證 AUC: {study.best_value:.4f}")
+    print("\n✅ 最佳參數組合與結果:")
+    best_trials = study.best_trials  # 獲取所有 Pareto 前沿試驗
+    for i, trial in enumerate(best_trials):
+        print(f"\n試驗 {i + 1}:")
+        for k, v in trial.params.items():
+            print(f"{k}: {v}")
+        print(f"目標值: {trial.values}")  # 顯示每個試驗的目標值 (e.g., [avg_auc, avg_loss])
+
+    # 可選：打印總試驗數
+    print(f"\n總共找到 {len(best_trials)} 個最佳試驗。")
+

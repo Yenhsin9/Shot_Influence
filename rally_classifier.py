@@ -20,19 +20,19 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
     max_len = shot_sequence_shape[0]
     """Preprocess input encoding: Input + Embedding + Concatenation + Masking"""
     # ✅ Input Layers
-    input_shots = tf.keras.Input(shape=shot_sequence_shape, name='Shots_input')  # (None, seq_len, 2)
-    input_shot_types = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Shot_types_input')
-    input_time_proportion = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Time_proportion_input')
-    input_hit_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Hit_area_input')
-    input_player_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Player_area_input')
-    input_opponent_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Opponent_area_input')
-    input_player_id = tf.keras.Input(shape=(shot_sequence_shape[0],1), name='Player_input')
-    input_rally = tf.keras.Input(shape=(rally_info_shape,), name='Rally_input')
-    input_masks = tf.keras.Input(shape=(shot_sequence_shape[0],), name='Mask_input')
+    input_shots = tf.keras.Input(shape=shot_sequence_shape, name='shots_input')  # (None, seq_len, 2)
+    input_shot_types = tf.keras.Input(shape=(shot_sequence_shape[0],), name='shot_types_input')
+    input_time_proportion = tf.keras.Input(shape=(shot_sequence_shape[0],), name='time_proportion_input')
+    input_hit_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='hit_area_input')
+    input_player_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='player_area_input')
+    input_opponent_area = tf.keras.Input(shape=(shot_sequence_shape[0],), name='opponent_area_input')
+    input_player_id = tf.keras.Input(shape=(shot_sequence_shape[0],1), name='player_input')
+    input_rally = tf.keras.Input(shape=(rally_info_shape,), name='rally_input')
+    input_masks = tf.keras.Input(shape=(shot_sequence_shape[0],), name='mask_input')
 
     # ✅ Location Embedding (Hit Area, Player Area, Opponent Area)
     if embed_area_size is not None:
-        area_embedding = tf.keras.layers.Embedding(input_dim=embed_area_size, output_dim=10, mask_zero=True, name='Area_embedding',embeddings_initializer=tf.keras.initializers.RandomUniform(minval=-1, maxval=1))
+        area_embedding = tf.keras.layers.Embedding(input_dim=embed_area_size, output_dim=10, mask_zero=True, name='area_embedding',embeddings_initializer=tf.keras.initializers.RandomUniform(minval=-1, maxval=1))
         embedded_hit_area = area_embedding(input_hit_area)
         embedded_player_area = area_embedding(input_player_area)
         embedded_opponent_area = area_embedding(input_opponent_area)
@@ -41,15 +41,15 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
 
     # ✅ Shot Type Embedding with Time Influence
     if embed_types_size is not None:
-        shot_embedding = tf.keras.layers.Embedding(input_dim=embed_types_size, output_dim=15, mask_zero=True, name='Shot_types_embedding',embeddings_initializer=tf.keras.initializers.RandomUniform(minval=-1, maxval=1))
+        shot_embedding = tf.keras.layers.Embedding(input_dim=embed_types_size, output_dim=15, mask_zero=True, name='shot_types_embedding',embeddings_initializer=tf.keras.initializers.RandomUniform(minval=-1, maxval=1))
         embedded_shot_types = shot_embedding(input_shot_types)
 
         mu_n = Dense(15, activation='linear', 
              kernel_initializer=tf.keras.initializers.RandomUniform(minval=-1, maxval=1), 
-             name='Mu_latent')(embedded_shot_types)
+             name='mu_latent')(embedded_shot_types)
         theta_n = Dense(15, activation='linear', 
                         kernel_initializer=tf.keras.initializers.RandomUniform(minval=-1, maxval=1), 
-                        name='Theta_latent')(embedded_shot_types)
+                        name='theta_latent')(embedded_shot_types)
         # ✅ Time Proportion Enhancement
         tiled_time_proportion = tf.keras.layers.Reshape(
             (max_len, 1)
@@ -59,18 +59,18 @@ def preprocess_inputs(shot_sequence_shape, rally_info_shape,
         )  # Shape: (None, max_len, 15)
 
         # μn * τn
-        time_mu_proportion = tf.keras.layers.Multiply(name='Time_proportion_multiply')([mu_n, tiled_time_proportion])
+        time_mu_proportion = tf.keras.layers.Multiply(name='time_proportion_multiply')([mu_n, tiled_time_proportion])
         # θn + μn * τn
-        temporal_score = tf.keras.layers.Add(name='Time_proportion_add')([theta_n, time_mu_proportion])
+        temporal_score = tf.keras.layers.Add(name='time_proportion_add')([theta_n, time_mu_proportion])
         # δn = sigmoid(θn + μn * τn)
-        temporal_score = tf.keras.layers.Activation('sigmoid', name='Time_activation')(temporal_score)
+        temporal_score = tf.keras.layers.Activation('sigmoid', name='time_activation')(temporal_score)
 
-        enhanced_shot_features = tf.keras.layers.Multiply(name='Shots_time_multiply')([temporal_score, embedded_shot_types])
+        enhanced_shot_features = tf.keras.layers.Multiply(name='shots_time_multiply')([temporal_score, embedded_shot_types])
     else:
         enhanced_shot_features = input_shot_types
  
     # ✅ **Concatenate Player Embedding, Location Embedding, and Enhanced Shot Features (Shot Encoder Output)**
-    shot_encoder_output = tf.keras.layers.Concatenate(name='Shot_encoder_output')([
+    shot_encoder_output = tf.keras.layers.Concatenate(name='shot_encoder_output')([
         embedded_hit_area, embedded_player_area, embedded_opponent_area, enhanced_shot_features, input_player_id, input_shots
     ])
 
@@ -86,6 +86,7 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
                    cnn_kwargs: Dict[str, Any] = {'filters': 32, 'kernel_size': 3},
                    transformer_kwargs: Dict[str, Any] = {},
                    dropout_rate: float = 0.2,
+                   l2_lambda: float = 1e-4,
                    dense_kwargs: Dict[str, Any] = {}) -> tf.keras.Model:
 
     # ✅ Get Processed Inputs and Shot Encoder Output
@@ -103,7 +104,7 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     shot_encoder_output = shot_encoder_output * mask 
 
     # ✅ CNN Feature Extraction with Masking
-    layer_cnn = StaggeredConv1D(name='Local_pattern_extraction', **cnn_kwargs)
+    layer_cnn = StaggeredConv1D(name='local_pattern_extraction', **cnn_kwargs)
     pattern_sequence = layer_cnn(shot_encoder_output, mask=mask)
     #pattern_sequence = tf.keras.layers.Dropout(0.2)(pattern_sequence) 
 
@@ -127,19 +128,19 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     #  (batch_size, 1, seq_len)
     mask = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=1), 
         output_shape=lambda s: (s[0], 1, s[1]), 
-        name='Expand_mask_dim_1'
+        name='expand_mask_dim_1'
     )(inputs[-1])
 
     # (batch_size, 1, 1, seq_len)
     mask = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=1), 
         output_shape=lambda s: (s[0], 1, 1, s[2]), 
-        name='Expand_mask_dim_2'
+        name='expand_mask_dim_2'
     )(mask)
 
     # Tile to (batch_size, num_heads, seq_len, seq_len)
     mask = tf.keras.layers.Lambda(lambda x: tf.tile(x, [1, num_heads, 1, 1]), 
         output_shape=lambda s: (s[0], num_heads, s[2], s[3]), 
-        name='Tile_mask_for_heads'
+        name='tile_mask_for_heads'
     )(mask)
 
     mha = MultiHeadAttention(num_heads=num_heads, key_dim=transformer_kwargs['key_dim'])
@@ -179,9 +180,9 @@ def proposed_model(shot_sequence_shape: Tuple[int, int],
     rally_representation = tf.keras.layers.GlobalMaxPooling1D()(masked_output)
 
     # ✅ Concatenate with Rally Information
-    layer_concat_rally = tf.keras.layers.Concatenate(name='Seq_rally_merging')([rally_representation, inputs[-2]])
-    # ✅ Final Dense Layer
-    output_win_prob = Dense(1, activation='sigmoid')(layer_concat_rally)
+    layer_concat_rally = tf.keras.layers.Concatenate(name='seq_rally_merging')([rally_representation, inputs[-2]])
+     # ✅ Final Dense Layer with L2 regularization
+    output_win_prob = Dense(1, activation='sigmoid', kernel_regularizer=l2(l2_lambda))(layer_concat_rally)
  
     model_predict = tf.keras.Model(inputs=inputs, outputs=output_win_prob)
     return model_predict

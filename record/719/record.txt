@@ -1,0 +1,15 @@
+paper1 their modal
+
+最佳模型來自 Fold 3，訓練 AUC: 0.8020
+
+Average Validation Metrics Across Folds:
+Average Val Loss: 0.5652
+Average Val AUC: 0.7883
+Average Val Brier Score: 0.1866
+-----------------------------------
+❯ python modal_evaluate.py
+Test data shape: (14065, 20)
+✅ Model weights loaded successfully: best_model_fold_3
+2025-07-19 23:36:13.376935: W tensorflow/core/platform/profile_utils/cpu_utils.cc:128] Failed to get CPU frequency: 0 Hz
+40/40 [==============================] - 0s 4ms/step - loss: 0.7816 - auc: 0.6036 - brier_score: 0.2737
+Test Loss: 0.7816 | AUC: 0.6036 | Brier: 0.2737
