@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import os
 import draw_plot
-
+from keras_transformer.gelu import gelu
 num_folds = 5
 
 # Compute type_mapping using all train folds
@@ -48,17 +48,19 @@ for fold in range(1, num_folds + 1):
     rally_predictors = ['score_diff', 'consecutive_points']
     target = 'is_target_win'
 
-    batch_size = 128
-    drop_rate = 0.4557
-    l2_lambda = 3.3933063028000713e-06
-    cnn_kwargs = {'filters': 64, 'kernel_size': 2, 'kernel_regularizer': tf.keras.regularizers.l2(2.4842660813632584e-05)}
+    batch_size = 32
+    drop_rate = 0.5345
+    l2_lambda = 0.00144
+    regularizer = tf.keras.regularizers.l2(l2_lambda)
+    dense_kwargs = {'kernel_regularizer': regularizer}
+    cnn_kwargs = {'filters': 32, 'kernel_size': 4, 'kernel_regularizer': tf.keras.regularizers.l2(0.0017)}
     transformer_kwargs = {
-        'num_heads': 1,
-        'key_dim': 64,
-        'ff_dim': 64,
-        'inner_dim': 32,
+        'encoder_num': 2,
+        'head_num': 4,
+        'hidden_dim': 16,
+        'feed_forward_activation': gelu,
     }
-    optimizer = tf.keras.optimizers.Adam(learning_rate=5.636337461086129e-05, clipnorm=1.0)
+    optimizer = tf.keras.optimizers.Adam(learning_rate= 0.0001, clipnorm=1.0)
     print(f"\nTraining Fold {fold}...")
     epochs = 100
     # Load fold data
@@ -109,8 +111,8 @@ for fold in range(1, num_folds + 1):
     val_x = [val_shots, val_shot_type, val_player_id, val_time_proportion, val_hit_area,
              val_player_area, val_opponent_area, val_rallies, val_masks]
 
-    # Build model
-    model = rc.proposed_model(
+
+    model = rc.transformer(
         (seq_len, train_shots.shape[2]),
         embed_types_size=len(type_mapping) + 1,
         embed_area_size=max(
@@ -118,11 +120,9 @@ for fold in range(1, num_folds + 1):
             train_data['hit_area'].nunique(), val_data['player_location_area'].nunique(),
             val_data['opponent_location_area'].nunique(), val_data['hit_area'].nunique()
         ) + 1,
-        rally_info_shape=len(rally_predictors),
-        cnn_kwargs=cnn_kwargs,
+        rally_info_shape=train_rallies.shape[1],
+        dense_kwargs=dense_kwargs,
         transformer_kwargs=transformer_kwargs,
-        dropout_rate=drop_rate,
-        l2_lambda=l2_lambda
     )
 
     model.compile(

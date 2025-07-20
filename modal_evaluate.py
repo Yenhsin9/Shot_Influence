@@ -8,7 +8,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint,Callback
 import os
 import csv
 from tensorflow.keras.models import load_model
-
+from keras_transformer.gelu import gelu
 # Load Data
 test_data = pd.read_csv('./data/test.csv')
 
@@ -48,32 +48,36 @@ indices_to_delete = [0, 3, 4, 5, 6, 7]
 test_shots = np.delete(test_shots, indices_to_delete, axis=2)
 
 # Model Hyperparameters
-batch_size = 128
-drop_rate =0.5405
-l2_lambda = 2.315771065542536e-05
-cnn_kwargs = {'filters': 16, 'kernel_size': 4, 'kernel_regularizer': tf.keras.regularizers.l2(0.00017)}
+batch_size = 32
+drop_rate = 0.5345
+l2_lambda = 0.00144
+regularizer = tf.keras.regularizers.l2(l2_lambda)
+dense_kwargs = {'kernel_regularizer': regularizer}
+cnn_kwargs = {'filters': 32, 'kernel_size': 4, 'kernel_regularizer': tf.keras.regularizers.l2(0.0017)}
 transformer_kwargs = {
-    'num_heads': 2,
-    'key_dim': 16,
-    'ff_dim': 16,
-    'inner_dim': 128
+    'encoder_num': 2,
+    'head_num': 4,
+    'hidden_dim': 16,
+    'feed_forward_activation': gelu,
 }
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0076, clipnorm=1.0)
-MODEL_NAME = 'proposedModal'
-MODEL_PATH = "best_model_fold_2.keras"
+optimizer = tf.keras.optimizers.Adam(learning_rate= 0.0001, clipnorm=1.0)
+MODEL_PATH = "best_model_fold_3.keras"
 
 #input data
 test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_hit_area ,test_player_area, test_opponent_area,test_rallies,test_masks]
 
 # Build the Model
-model = rc.proposed_model(
-    (seq_len, test_shots.shape[2]),
-    embed_types_size=12,
-    embed_area_size=12,
-    rally_info_shape=len(rally_predictors),
-    cnn_kwargs=cnn_kwargs,
-    transformer_kwargs=transformer_kwargs,
-)
+model = rc.transformer(
+        (seq_len, test_shots.shape[2]),
+        embed_types_size=12,
+        embed_area_size=max(
+            test_data['player_location_area'].nunique(), test_data['opponent_location_area'].nunique(),
+            test_data['hit_area'].nunique(),
+        ) + 1,
+        rally_info_shape=test_rallies.shape[1],
+        dense_kwargs=dense_kwargs,
+        transformer_kwargs=transformer_kwargs,
+    )
 
 model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=[
         tf.keras.metrics.AUC(name='auc'),

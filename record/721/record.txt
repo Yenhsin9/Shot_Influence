@@ -1,0 +1,9 @@
+Average Validation Metrics Across Folds:
+Average Val Loss: 0.6044
+Average Val AUC: 0.7284
+Average Val Brier Score: 0.2073
+
+✅ Model weights loaded successfully: best_model_fold_3.keras
+2025-07-21 00:08:32.089789: W tensorflow/core/platform/profile_utils/cpu_utils.cc:128] Failed to get CPU frequency: 0 Hz
+40/40 [==============================] - 1s 4ms/step - loss: 0.6680 - auc: 0.6614 - brier_score: 0.2323
+Test Loss: 0.6680 | AUC: 0.6614 | Brier: 0.2323

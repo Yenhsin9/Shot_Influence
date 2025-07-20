@@ -8,7 +8,7 @@ import os
 import optuna
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import draw_plot
-
+from keras_transformer.gelu import gelu
 def run_trial(trial):
     # 固定參數
     num_folds = 1
@@ -27,9 +27,11 @@ def run_trial(trial):
     key_dim = filters
     ff_dim = filters
     num_heads = trial.suggest_categorical("num_heads", [1, 2, 4])
-    inner_dim = trial.suggest_categorical("inner_dim", [32, 64, 128])
+    hidden_dim = trial.suggest_categorical("inner_dim", [16,32, 64])
     learning_rate = trial.suggest_float("lr",1e-5, 1e-3, log=True)
-    l2_lambda = trial.suggest_float("l2_lambda", 1e-6, 1e-3, log=True)  # 新增的 L2 正則化係數
+    l2_lambda = trial.suggest_float('l2_lambda', 1e-5, 1e-2, log=True)
+    regularizer = tf.keras.regularizers.l2(l2_lambda)
+    dense_kwargs = {'kernel_regularizer': regularizer}
 
     cnn_kwargs = {
         "filters": filters,
@@ -38,10 +40,10 @@ def run_trial(trial):
     }
 
     transformer_kwargs = {
-        "num_heads": num_heads,
-        "key_dim": key_dim,
-        "ff_dim": ff_dim,
-        "inner_dim": inner_dim
+        'encoder_num': 2,
+        'head_num': num_heads,
+        'hidden_dim': hidden_dim,
+        'feed_forward_activation': gelu,
     }
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
@@ -93,22 +95,17 @@ def run_trial(trial):
     val_x = [val_shots, val_shot_type, val_player_id, val_time_proportion, val_hit_area,
              val_player_area, val_opponent_area, val_rallies, val_masks]
 
-    model = rc.proposed_model(
+    model = rc.transformer(
         (seq_len, train_shots.shape[2]),
         embed_types_size=len(type_mapping) + 1,
-        embed_area_size = max(
-            train_data['player_location_area'].max(),
-            train_data['opponent_location_area'].max(),
-            train_data['hit_area'].max(),
-            val_data['player_location_area'].max(),
-            val_data['opponent_location_area'].max(),
-            val_data['hit_area'].max()
+        embed_area_size=max(
+            train_data['player_location_area'].nunique(), train_data['opponent_location_area'].nunique(),
+            train_data['hit_area'].nunique(), val_data['player_location_area'].nunique(),
+            val_data['opponent_location_area'].nunique(), val_data['hit_area'].nunique()
         ) + 1,
-        rally_info_shape=len(rally_predictors),
-        cnn_kwargs=cnn_kwargs,
+        rally_info_shape=train_rallies.shape[1],
+        dense_kwargs=dense_kwargs,
         transformer_kwargs=transformer_kwargs,
-        dropout_rate=dropout_rate,
-        l2_lambda=l2_lambda,
     )
 
     model.compile(
