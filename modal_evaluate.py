@@ -61,7 +61,7 @@ transformer_kwargs = {
     'feed_forward_activation': gelu,
 }
 optimizer = tf.keras.optimizers.Adam(learning_rate= 0.0001, clipnorm=1.0)
-MODEL_PATH = "best_model_fold_5.keras"
+MODEL_PATH = "best_model_fold_3.keras"
 
 #input data
 test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_hit_area ,test_player_area, test_opponent_area,test_rallies,test_masks]

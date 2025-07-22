@@ -198,7 +198,8 @@ for fold in range(1, num_folds + 1):
 
     # Plotting Training and Validation Loss
     draw_plot.draw_plot(
-        fold_train_auc, fold_val_auc, fold_train_brier, fold_val_brier, fold_train_loss, fold_val_loss
+        fold_train_auc, fold_val_auc, fold_train_brier, fold_val_brier, fold_train_loss, fold_val_loss,
+        fold_train_acc,fold_val_acc,
     )
 
 # 提取每個 fold 的最佳 AUC
