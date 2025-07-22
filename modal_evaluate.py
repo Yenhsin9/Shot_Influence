@@ -81,7 +81,8 @@ model = rc.proposed_model(
 
 model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=[
         tf.keras.metrics.AUC(name='auc'),
-        tf.keras.metrics.MeanSquaredError(name='brier_score')
+        tf.keras.metrics.MeanSquaredError(name='brier_score'),
+        tf.keras.metrics.BinaryAccuracy(name='accuracy')
     ])
 
 if os.path.exists(MODEL_PATH):
@@ -92,5 +93,5 @@ else:
     exit()
 
 test_results = model.evaluate(test_x, test_target)
-loss, auc, brier = test_results
-print(f"Test Loss: {loss:.4f} | AUC: {auc:.4f} | Brier: {brier:.4f}")
+loss, auc, brier, acc = test_results
+print(f"Test Loss: {loss:.4f} | Test AUC: {auc:.4f} | Test Brier: {brier:.4f} | Test Accuracy: {acc:.4f}")
