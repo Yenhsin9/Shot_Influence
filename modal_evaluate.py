@@ -61,7 +61,7 @@ transformer_kwargs = {
     'feed_forward_activation': gelu,
 }
 optimizer = tf.keras.optimizers.Adam(learning_rate= 0.0001, clipnorm=1.0)
-MODEL_PATH = "best_model_fold_3.keras"
+MODEL_PATH = "best_model_fold_5.keras"
 
 #input data
 test_x = [test_shots, test_shot_type, test_player_id,test_time_proportion,test_hit_area ,test_player_area, test_opponent_area,test_rallies,test_masks]
@@ -81,7 +81,8 @@ model = rc.transformer(
 
 model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=[
         tf.keras.metrics.AUC(name='auc'),
-        tf.keras.metrics.MeanSquaredError(name='brier_score')
+        tf.keras.metrics.MeanSquaredError(name='brier_score'),
+        tf.keras.metrics.BinaryAccuracy(name='accuracy')
     ])
 
 if os.path.exists(MODEL_PATH):
@@ -102,5 +103,6 @@ callbacks = [
 ]
 
 test_results = model.evaluate(test_x, test_target)
-loss, auc, brier = test_results
-print(f"Test Loss: {loss:.4f} | AUC: {auc:.4f} | Brier: {brier:.4f}")
+loss, auc, brier, acc = test_results
+print(f"Test Loss: {loss:.4f} | Test AUC: {auc:.4f} | Test Brier: {brier:.4f} | Test Accuracy: {acc:.4f}")
+

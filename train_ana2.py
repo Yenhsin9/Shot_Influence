@@ -31,6 +31,8 @@ all_train_auc = []
 all_val_auc = []
 all_train_brier = []
 all_val_brier = []
+all_train_acc = []
+all_val_acc = []
 final_val_aucs = []  # To store final validation AUC for each fold
 
 # 5-fold cross-validation loop
@@ -42,6 +44,8 @@ for fold in range(1, num_folds + 1):
     fold_val_auc = []
     fold_train_brier = []
     fold_val_brier = []
+    fold_train_acc = []
+    fold_val_acc = []
 
     # Define hyperparameters and configurations
     shot_predictors = ['type', 'backhand', 'aroundhead', 'hit_area', 'player_location_area', 'opponent_location_area', 'player']
@@ -130,7 +134,8 @@ for fold in range(1, num_folds + 1):
         loss='binary_crossentropy',
         metrics=[
             tf.keras.metrics.AUC(name='auc'),
-            tf.keras.metrics.MeanSquaredError(name='brier_score')
+            tf.keras.metrics.MeanSquaredError(name='brier_score'),
+            tf.keras.metrics.BinaryAccuracy(name='accuracy')
         ]
     )
 
@@ -161,6 +166,8 @@ for fold in range(1, num_folds + 1):
     fold_val_auc.extend(history.history['val_auc'])
     fold_train_brier.extend(history.history['brier_score'])
     fold_val_brier.extend(history.history['val_brier_score'])
+    fold_train_acc.extend(history.history['accuracy'])          
+    fold_val_acc.extend(history.history['val_accuracy'])        
 
     # Append fold metrics to the global lists
     all_train_loss.append(fold_train_loss)
@@ -169,7 +176,21 @@ for fold in range(1, num_folds + 1):
     all_val_auc.append(fold_val_auc)
     all_train_brier.append(fold_train_brier)
     all_val_brier.append(fold_val_brier)
-    
+    all_train_acc.append(fold_train_acc)
+    all_val_acc.append(fold_val_acc)
+
+    # 儲存 Train Metrics
+    pd.DataFrame(all_train_loss).T.to_csv(f'./plot_data/fold_{fold}_all_train_loss.csv', index=False)
+    pd.DataFrame(all_train_auc).T.to_csv(f'./plot_data/fold_{fold}_all_train_auc.csv', index=False)
+    pd.DataFrame(all_train_brier).T.to_csv(f'./plot_data/fold_{fold}_all_train_brier.csv', index=False)
+    pd.DataFrame(all_train_acc).T.to_csv(f'./plot_data/fold_{fold}_all_train_acc.csv', index=False)
+
+    # 儲存 Validation Metrics
+    pd.DataFrame(all_val_loss).T.to_csv(f'./plot_data/fold_{fold}_all_val_loss.csv', index=False)
+    pd.DataFrame(all_val_auc).T.to_csv(f'./plot_data/fold_{fold}_all_val_auc.csv', index=False)
+    pd.DataFrame(all_val_brier).T.to_csv(f'./plot_data/fold_{fold}_all_val_brier.csv', index=False)
+    pd.DataFrame(all_val_acc).T.to_csv(f'./plot_data/fold_{fold}_all_val_acc.csv', index=False)
+
     # Print final validation metrics
     print(f"Fold {fold} - Best Val Loss: {min(fold_val_loss):.4f}, "
           f"Best Val AUC: {max(fold_val_auc):.4f}, "
@@ -184,6 +205,7 @@ for fold in range(1, num_folds + 1):
 best_aucs_per_fold = [max(fold_auc) for fold_auc in all_val_auc]
 best_loss_per_fold = [min(fold_loss) for fold_loss in all_val_loss]
 best_brier_per_fold = [min(fold_brier) for fold_brier in all_val_brier]
+best_acc_per_fold = [max(fold_acc) for fold_acc in all_val_acc]
 
 # 找到最佳 fold
 if best_aucs_per_fold:
@@ -196,7 +218,9 @@ if best_aucs_per_fold:
 avg_val_loss = np.mean(best_loss_per_fold)
 avg_val_auc = np.mean(best_aucs_per_fold)
 avg_val_brier = np.mean(best_brier_per_fold)
+avg_val_acc = np.mean(best_acc_per_fold)
 print("\nAverage Validation Metrics Across Folds:")
 print(f"Average Val Loss: {avg_val_loss:.4f}")
 print(f"Average Val AUC: {avg_val_auc:.4f}")
 print(f"Average Val Brier Score: {avg_val_brier:.4f}")
+print(f"Average Val Accuracy: {avg_val_acc:.4f}")
