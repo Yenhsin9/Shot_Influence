@@ -182,8 +182,10 @@ for fold in range(1, num_folds + 1):
 
     # Plotting Training and Validation Loss
     draw_plot.draw_plot(
-        fold_train_auc, fold_val_auc, fold_train_brier, fold_val_brier, fold_train_loss, fold_val_loss
+        fold_train_auc, fold_val_auc, fold_train_brier, fold_val_brier, fold_train_loss, fold_val_loss,
+        fold_train_acc,fold_val_acc,
     )
+
 
  # 儲存 Train Metrics
 pd.DataFrame(all_train_loss).T.to_csv(f'./plot_data/all_train_loss.csv', index=False)
@@ -213,10 +215,11 @@ if best_aucs_per_fold:
 # Compute average validation metrics
 avg_val_loss = np.mean(best_loss_per_fold)
 avg_val_auc = np.mean(best_aucs_per_fold)
+std_val_auc = np.std(best_aucs_per_fold)
 avg_val_brier = np.mean(best_brier_per_fold)
 avg_acc = np.mean(best_acc_per_fold)
 print("\nAverage Validation Metrics Across Folds:")
 print(f"Average Val Loss: {avg_val_loss:.4f}")
-print(f"Average Val AUC: {avg_val_auc:.4f}")
+print(f"Average Val AUC: {avg_val_auc:.4f} (±{std_val_auc:.4f})")
 print(f"Average Val Brier Score: {avg_val_brier:.4f}")
 print(f"Average Val Accuracy: {avg_acc:.4f}")

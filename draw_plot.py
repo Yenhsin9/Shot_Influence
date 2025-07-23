@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 
-def draw_plot(train_auc_list,val_auc_list,train_brier_list,val_brier_list,train_loss_list,val_loss_list):
+def draw_plot(train_auc_list,val_auc_list,train_brier_list,val_brier_list,train_loss_list,val_loss_list,train_acc_list,val_acc_list):
     epochs = range(1, len(train_auc_list) + 1)
     # 2. 畫 AUC 曲線
     plt.figure()
@@ -34,5 +34,16 @@ def draw_plot(train_auc_list,val_auc_list,train_brier_list,val_brier_list,train_
     plt.title('Loss over Epochs')
     plt.legend()
     plt.grid(True)              
+    plt.show()
+
+    # 5. 畫 ACC 曲線
+    plt.figure()
+    plt.plot(epochs, train_acc_list, label='Train ACC')
+    plt.plot(epochs, val_acc_list,   label='Val ACC')
+    plt.xlabel('Epoch')
+    plt.ylabel('ACC')
+    plt.title('ACC over Epochs')
+    plt.legend()
+    plt.grid(True)
     plt.show()
     
