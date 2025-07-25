@@ -32,6 +32,7 @@ def run_trial(trial):
     l2_lambda = trial.suggest_float('l2_lambda', 1e-5, 1e-2, log=True)
     regularizer = tf.keras.regularizers.l2(l2_lambda)
     dense_kwargs = {'kernel_regularizer': regularizer}
+    lstm_units = trial.suggest_int("lstm_units", 16, 32, 64)
 
     cnn_kwargs = {
         "filters": filters,
@@ -45,6 +46,7 @@ def run_trial(trial):
         'hidden_dim': hidden_dim,
         'feed_forward_activation': gelu,
     }
+    lstm_kwargs = {'units': lstm_units}
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
 
@@ -95,7 +97,7 @@ def run_trial(trial):
     val_x = [val_shots, val_shot_type, val_player_id, val_time_proportion, val_hit_area,
              val_player_area, val_opponent_area, val_rallies, val_masks]
 
-    model = rc.transformer(
+    model = rc.lstm(
         (seq_len, train_shots.shape[2]),
         embed_types_size=len(type_mapping) + 1,
         embed_area_size=max(
@@ -105,7 +107,7 @@ def run_trial(trial):
         ) + 1,
         rally_info_shape=train_rallies.shape[1],
         dense_kwargs=dense_kwargs,
-        transformer_kwargs=transformer_kwargs,
+        lstm_kwargs=lstm_kwargs,
     )
 
     model.compile(
@@ -136,18 +138,18 @@ def run_trial(trial):
     val_loss = history.history['val_loss']
 
     avg_auc = np.mean(val_auc[-5:])
-    avg_loss = np.mean(val_loss[-5:])
+    #avg_loss = np.mean(val_loss[-5:])
     std_auc = np.std(val_auc)
-    std_loss = np.std(val_loss)
+   # std_loss = np.std(val_loss)
 
     # 刪除 best_model.keras 檔案
     if os.path.exists("best_model_fold_1.keras"):
         os.remove("best_model_fold_1.keras")
 
-    return  avg_loss, std_loss
+    return  avg_auc, std_auc
 
 if __name__ == "__main__":
-    study = optuna.create_study(directions=["minimize", "minimize"])
+    study = optuna.create_study(directions=["maximize", "minimize"])
     study.optimize(run_trial, n_trials=30)
 
     print("\n✅ 最佳參數組合與結果:")

@@ -64,6 +64,7 @@ for fold in range(1, num_folds + 1):
         'hidden_dim': 16,
         'feed_forward_activation': gelu,
     }
+    lstm_kwargs = {'units': 32}
     optimizer = tf.keras.optimizers.Adam(learning_rate= 0.0001, clipnorm=1.0)
     print(f"\nTraining Fold {fold}...")
     epochs = 100
@@ -116,7 +117,7 @@ for fold in range(1, num_folds + 1):
              val_player_area, val_opponent_area, val_rallies, val_masks]
 
 
-    model = rc.transformer(
+    model = rc.lstm(
         (seq_len, train_shots.shape[2]),
         embed_types_size=len(type_mapping) + 1,
         embed_area_size=max(
@@ -126,7 +127,7 @@ for fold in range(1, num_folds + 1):
         ) + 1,
         rally_info_shape=train_rallies.shape[1],
         dense_kwargs=dense_kwargs,
-        transformer_kwargs=transformer_kwargs,
+        lstm_kwargs=lstm_kwargs,
     )
 
     model.compile(
@@ -179,17 +180,17 @@ for fold in range(1, num_folds + 1):
     all_train_acc.append(fold_train_acc)
     all_val_acc.append(fold_val_acc)
 
-    # 儲存 Train Metrics
-    pd.DataFrame(all_train_loss).T.to_csv(f'./plot_data/fold_{fold}_all_train_loss.csv', index=False)
-    pd.DataFrame(all_train_auc).T.to_csv(f'./plot_data/fold_{fold}_all_train_auc.csv', index=False)
-    pd.DataFrame(all_train_brier).T.to_csv(f'./plot_data/fold_{fold}_all_train_brier.csv', index=False)
-    pd.DataFrame(all_train_acc).T.to_csv(f'./plot_data/fold_{fold}_all_train_acc.csv', index=False)
+    # # 儲存 Train Metrics
+    # pd.DataFrame(all_train_loss).T.to_csv(f'./plot_data/fold_{fold}_all_train_loss.csv', index=False)
+    # pd.DataFrame(all_train_auc).T.to_csv(f'./plot_data/fold_{fold}_all_train_auc.csv', index=False)
+    # pd.DataFrame(all_train_brier).T.to_csv(f'./plot_data/fold_{fold}_all_train_brier.csv', index=False)
+    # pd.DataFrame(all_train_acc).T.to_csv(f'./plot_data/fold_{fold}_all_train_acc.csv', index=False)
 
-    # 儲存 Validation Metrics
-    pd.DataFrame(all_val_loss).T.to_csv(f'./plot_data/fold_{fold}_all_val_loss.csv', index=False)
-    pd.DataFrame(all_val_auc).T.to_csv(f'./plot_data/fold_{fold}_all_val_auc.csv', index=False)
-    pd.DataFrame(all_val_brier).T.to_csv(f'./plot_data/fold_{fold}_all_val_brier.csv', index=False)
-    pd.DataFrame(all_val_acc).T.to_csv(f'./plot_data/fold_{fold}_all_val_acc.csv', index=False)
+    # # 儲存 Validation Metrics
+    # pd.DataFrame(all_val_loss).T.to_csv(f'./plot_data/fold_{fold}_all_val_loss.csv', index=False)
+    # pd.DataFrame(all_val_auc).T.to_csv(f'./plot_data/fold_{fold}_all_val_auc.csv', index=False)
+    # pd.DataFrame(all_val_brier).T.to_csv(f'./plot_data/fold_{fold}_all_val_brier.csv', index=False)
+    # pd.DataFrame(all_val_acc).T.to_csv(f'./plot_data/fold_{fold}_all_val_acc.csv', index=False)
 
     # Print final validation metrics
     print(f"Fold {fold} - Best Val Loss: {min(fold_val_loss):.4f}, "
